@@ -1,4 +1,4 @@
--- @shouldFailWith CannotApplyFunction
+-- @shouldFailWith TypesDoNotUnify
 module Main where
 
 import Prelude
