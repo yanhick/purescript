@@ -1,7 +1,7 @@
 -- |
 -- Common code generation utility functions
 --
-module Language.PureScript.CodeGen.JS.Common where
+module Language.PureScript.CodeGen.Haxe.Common where
 
 import Prelude.Compat
 

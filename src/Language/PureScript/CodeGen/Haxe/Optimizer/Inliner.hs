@@ -1,7 +1,7 @@
 -- |
 -- This module provides basic inlining capabilities
 --
-module Language.PureScript.CodeGen.JS.Optimizer.Inliner
+module Language.PureScript.CodeGen.Haxe.Optimizer.Inliner
   ( inlineVariables
   , inlineCommonValues
   , inlineCommonOperators
@@ -17,73 +17,73 @@ import Control.Monad.Supply.Class (MonadSupply, freshName)
 
 import Data.Maybe (fromMaybe)
 
-import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.CodeGen.Haxe.AST
+import Language.PureScript.CodeGen.Haxe.Optimizer.Common
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:
 -- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
 -- Needs to be: { 0..toFixed(10); }
 -- Probably needs to be fixed in pretty-printer instead.
-shouldInline :: JS -> Bool
-shouldInline (JSVar _ _) = True
-shouldInline (JSNumericLiteral _ _) = True
-shouldInline (JSStringLiteral _ _) = True
-shouldInline (JSBooleanLiteral _ _) = True
-shouldInline (JSAccessor _ _ val) = shouldInline val
-shouldInline (JSIndexer _ index val) = shouldInline index && shouldInline val
+shouldInline :: Haxe -> Bool
+shouldInline (HaxeVar _ _) = True
+shouldInline (HaxeNumericLiteral _ _) = True
+shouldInline (HaxeStringLiteral _ _) = True
+shouldInline (HaxeBooleanLiteral _ _) = True
+shouldInline (HaxeAccessor _ _ val) = shouldInline val
+shouldInline (HaxeIndexer _ index val) = shouldInline index && shouldInline val
 shouldInline _ = False
 
-etaConvert :: JS -> JS
-etaConvert = everywhereOnJS convert
+etaConvert :: Haxe -> Haxe
+etaConvert = everywhereOnHaxe convert
   where
-  convert :: JS -> JS
-  convert (JSBlock ss [JSReturn _ (JSApp _ (JSFunction _ Nothing idents block@(JSBlock _ body)) args)])
+  convert :: Haxe -> Haxe
+  convert (HaxeBlock ss [HaxeReturn _ (HaxeApp _ (HaxeFunction _ Nothing idents block@(HaxeBlock _ body)) args)])
     | all shouldInline args &&
-      not (any (`isRebound` block) (map (JSVar Nothing) idents)) &&
+      not (any (`isRebound` block) (map (HaxeVar Nothing) idents)) &&
       not (any (`isRebound` block) args)
-      = JSBlock ss (map (replaceIdents (zip idents args)) body)
-  convert (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ (JSApp _ fn [])])) = fn
+      = HaxeBlock ss (map (replaceIdents (zip idents args)) body)
+  convert (HaxeFunction _ Nothing [] (HaxeBlock _ [HaxeReturn _ (HaxeApp _ fn [])])) = fn
   convert js = js
 
-unThunk :: JS -> JS
-unThunk = everywhereOnJS convert
+unThunk :: Haxe -> Haxe
+unThunk = everywhereOnHaxe convert
   where
-  convert :: JS -> JS
-  convert (JSBlock ss []) = JSBlock ss []
-  convert (JSBlock ss jss) =
+  convert :: Haxe -> Haxe
+  convert (HaxeBlock ss []) = HaxeBlock ss []
+  convert (HaxeBlock ss jss) =
     case last jss of
-      JSReturn _ (JSApp _ (JSFunction _ Nothing [] (JSBlock _ body)) []) -> JSBlock ss $ init jss ++ body
-      _ -> JSBlock ss jss
+      HaxeReturn _ (HaxeApp _ (HaxeFunction _ Nothing [] (HaxeBlock _ body)) []) -> HaxeBlock ss $ init jss ++ body
+      _ -> HaxeBlock ss jss
   convert js = js
 
-evaluateIifes :: JS -> JS
-evaluateIifes = everywhereOnJS convert
+evaluateIifes :: Haxe -> Haxe
+evaluateIifes = everywhereOnHaxe convert
   where
-  convert :: JS -> JS
-  convert (JSApp _ (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ ret])) []) = ret
+  convert :: Haxe -> Haxe
+  convert (HaxeApp _ (HaxeFunction _ Nothing [] (HaxeBlock _ [HaxeReturn _ ret])) []) = ret
   convert js = js
 
-inlineVariables :: JS -> JS
-inlineVariables = everywhereOnJS $ removeFromBlock go
+inlineVariables :: Haxe -> Haxe
+inlineVariables = everywhereOnHaxe $ removeFromBlock go
   where
-  go :: [JS] -> [JS]
+  go :: [Haxe] -> [Haxe]
   go [] = []
-  go (JSVariableIntroduction _ var (Just js) : sts)
+  go (HaxeVariableIntroduction _ var (Just js) : sts)
     | shouldInline js && not (any (isReassigned var) sts) && not (any (isRebound js) sts) && not (any (isUpdated var) sts) =
       go (map (replaceIdent var js) sts)
   go (s:sts) = s : go sts
 
-inlineCommonValues :: JS -> JS
-inlineCommonValues = everywhereOnJS convert
+inlineCommonValues :: Haxe -> Haxe
+inlineCommonValues = everywhereOnHaxe convert
   where
-  convert :: JS -> JS
-  convert (JSApp ss fn [dict])
-    | isDict' [semiringNumber, semiringInt] dict && isFn fnZero fn = JSNumericLiteral ss (Left 0)
-    | isDict' [semiringNumber, semiringInt] dict && isFn fnOne fn = JSNumericLiteral ss (Left 1)
-    | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral ss False
-    | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral ss True
-  convert (JSApp ss (JSApp _ (JSApp _ fn [dict]) [x]) [y])
+  convert :: Haxe -> Haxe
+  convert (HaxeApp ss fn [dict])
+    | isDict' [semiringNumber, semiringInt] dict && isFn fnZero fn = HaxeNumericLiteral ss (Left 0)
+    | isDict' [semiringNumber, semiringInt] dict && isFn fnOne fn = HaxeNumericLiteral ss (Left 1)
+    | isDict boundedBoolean dict && isFn fnBottom fn = HaxeBooleanLiteral ss False
+    | isDict boundedBoolean dict && isFn fnTop fn = HaxeBooleanLiteral ss True
+  convert (HaxeApp ss (HaxeApp _ (HaxeApp _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isFn fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isFn fnMultiply fn = intOp ss Multiply x y
     | isDict euclideanRingInt dict && isFn fnDivide fn = intOp ss Divide x y
@@ -97,18 +97,18 @@ inlineCommonValues = everywhereOnJS convert
   fnDivide = (C.dataEuclideanRing, C.div)
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
-  intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
+  intOp ss op x y = HaxeBinary ss BitwiseOr (HaxeBinary ss op x y) (HaxeNumericLiteral ss (Left 0))
 
-inlineNonClassFunction :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
-inlineNonClassFunction (m, op) f = everywhereOnJS convert
+inlineNonClassFunction :: (String, String) -> (Haxe -> Haxe -> Haxe) -> Haxe -> Haxe
+inlineNonClassFunction (m, op) f = everywhereOnHaxe convert
   where
-  convert :: JS -> JS
-  convert (JSApp _ (JSApp _ op' [x]) [y]) | isOp op' = f x y
+  convert :: Haxe -> Haxe
+  convert (HaxeApp _ (HaxeApp _ op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
+  isOp (HaxeAccessor _ op' (HaxeVar _ m')) = m == m' && op == op'
   isOp _ = False
 
-inlineCommonOperators :: JS -> JS
+inlineCommonOperators :: Haxe -> Haxe
 inlineCommonOperators = applyAll $
   [ binary semiringNumber opAdd Add
   , binary semiringNumber opMul Multiply
@@ -167,92 +167,92 @@ inlineCommonOperators = applyAll $
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
   , unary'  C.dataIntBits C.complement BitwiseNot
 
-  , inlineNonClassFunction (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
-  , inlineNonClassFunction (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
-  , inlineNonClassFunction (C.dataArrayUnsafe, C.unsafeIndex) $ flip (JSIndexer Nothing)
+  , inlineNonClassFunction (C.dataFunction, C.apply) $ \f x -> HaxeApp Nothing f [x]
+  , inlineNonClassFunction (C.dataFunction, C.applyFlipped) $ \x f -> HaxeApp Nothing f [x]
+  , inlineNonClassFunction (C.dataArrayUnsafe, C.unsafeIndex) $ flip (HaxeIndexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
-  binary :: (String, String) -> (String, String) -> BinaryOperator -> JS -> JS
-  binary dict fns op = everywhereOnJS convert
+  binary :: (String, String) -> (String, String) -> BinaryOperator -> Haxe -> Haxe
+  binary dict fns op = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isFn fns fn = JSBinary ss op x y
+    convert :: Haxe -> Haxe
+    convert (HaxeApp ss (HaxeApp _ (HaxeApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isFn fns fn = HaxeBinary ss op x y
     convert other = other
-  binary' :: String -> String -> BinaryOperator -> JS -> JS
-  binary' moduleName opString op = everywhereOnJS convert
+  binary' :: String -> String -> BinaryOperator -> Haxe -> Haxe
+  binary' moduleName opString op = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert (JSApp ss (JSApp _ fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary ss op x y
+    convert :: Haxe -> Haxe
+    convert (HaxeApp ss (HaxeApp _ fn [x]) [y]) | isFn (moduleName, opString) fn = HaxeBinary ss op x y
     convert other = other
-  unary :: (String, String) -> (String, String) -> UnaryOperator -> JS -> JS
-  unary dicts fns op = everywhereOnJS convert
+  unary :: (String, String) -> (String, String) -> UnaryOperator -> Haxe -> Haxe
+  unary dicts fns op = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict dicts dict' && isFn fns fn = JSUnary ss op x
+    convert :: Haxe -> Haxe
+    convert (HaxeApp ss (HaxeApp _ fn [dict']) [x]) | isDict dicts dict' && isFn fns fn = HaxeUnary ss op x
     convert other = other
-  unary' :: String -> String -> UnaryOperator -> JS -> JS
-  unary' moduleName fnName op = everywhereOnJS convert
+  unary' :: String -> String -> UnaryOperator -> Haxe -> Haxe
+  unary' moduleName fnName op = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert (JSApp ss fn [x]) | isFn (moduleName, fnName) fn = JSUnary ss op x
+    convert :: Haxe -> Haxe
+    convert (HaxeApp ss fn [x]) | isFn (moduleName, fnName) fn = HaxeUnary ss op x
     convert other = other
-  mkFn :: Int -> JS -> JS
-  mkFn 0 = everywhereOnJS convert
+  mkFn :: Int -> Haxe -> Haxe
+  mkFn 0 = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert (JSApp _ mkFnN [JSFunction s1 Nothing [_] (JSBlock s2 js)]) | isNFn C.mkFn 0 mkFnN =
-      JSFunction s1 Nothing [] (JSBlock s2 js)
+    convert :: Haxe -> Haxe
+    convert (HaxeApp _ mkFnN [HaxeFunction s1 Nothing [_] (HaxeBlock s2 js)]) | isNFn C.mkFn 0 mkFnN =
+      HaxeFunction s1 Nothing [] (HaxeBlock s2 js)
     convert other = other
-  mkFn n = everywhereOnJS convert
+  mkFn n = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
-    convert orig@(JSApp ss mkFnN [fn]) | isNFn C.mkFn n mkFnN =
+    convert :: Haxe -> Haxe
+    convert orig@(HaxeApp ss mkFnN [fn]) | isNFn C.mkFn n mkFnN =
       case collectArgs n [] fn of
-        Just (args, js) -> JSFunction ss Nothing args (JSBlock ss js)
+        Just (args, js) -> HaxeFunction ss Nothing args (HaxeBlock ss js)
         Nothing -> orig
     convert other = other
-    collectArgs :: Int -> [String] -> JS -> Maybe ([String], [JS])
-    collectArgs 1 acc (JSFunction _ Nothing [oneArg] (JSBlock _ js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
-    collectArgs m acc (JSFunction _ Nothing [oneArg] (JSBlock _ [JSReturn _ ret])) = collectArgs (m - 1) (oneArg : acc) ret
+    collectArgs :: Int -> [String] -> Haxe -> Maybe ([String], [Haxe])
+    collectArgs 1 acc (HaxeFunction _ Nothing [oneArg] (HaxeBlock _ js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
+    collectArgs m acc (HaxeFunction _ Nothing [oneArg] (HaxeBlock _ [HaxeReturn _ ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 
-  isNFn :: String -> Int -> JS -> Bool
-  isNFn prefix n (JSVar _ name) = name == (prefix ++ show n)
-  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix ++ show n)
+  isNFn :: String -> Int -> Haxe -> Bool
+  isNFn prefix n (HaxeVar _ name) = name == (prefix ++ show n)
+  isNFn prefix n (HaxeAccessor _ name (HaxeVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix ++ show n)
   isNFn _ _ _ = False
 
-  runFn :: Int -> JS -> JS
-  runFn n = everywhereOnJS convert
+  runFn :: Int -> Haxe -> Haxe
+  runFn n = everywhereOnHaxe convert
     where
-    convert :: JS -> JS
+    convert :: Haxe -> Haxe
     convert js = fromMaybe js $ go n [] js
 
-    go :: Int -> [JS] -> JS -> Maybe JS
-    go 0 acc (JSApp ss runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp ss fn acc)
-    go m acc (JSApp _ lhs [arg]) = go (m - 1) (arg : acc) lhs
+    go :: Int -> [Haxe] -> Haxe -> Maybe Haxe
+    go 0 acc (HaxeApp ss runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (HaxeApp ss fn acc)
+    go m acc (HaxeApp _ lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: (MonadSupply m) => JS -> m JS
-inlineFnComposition = everywhereOnJSTopDownM convert
+inlineFnComposition :: (MonadSupply m) => Haxe -> m Haxe
+inlineFnComposition = everywhereOnHaxeTopDownM convert
   where
-  convert :: (MonadSupply m) => JS -> m JS
-  convert (JSApp s1 (JSApp s2 (JSApp _ (JSApp _ fn [dict']) [x]) [y]) [z])
-    | isFnCompose dict' fn = return $ JSApp s1 x [JSApp s2 y [z]]
-    | isFnComposeFlipped dict' fn = return $ JSApp s2 y [JSApp s1 x [z]]
-  convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y])
+  convert :: (MonadSupply m) => Haxe -> m Haxe
+  convert (HaxeApp s1 (HaxeApp s2 (HaxeApp _ (HaxeApp _ fn [dict']) [x]) [y]) [z])
+    | isFnCompose dict' fn = return $ HaxeApp s1 x [HaxeApp s2 y [z]]
+    | isFnComposeFlipped dict' fn = return $ HaxeApp s2 y [HaxeApp s1 x [z]]
+  convert (HaxeApp ss (HaxeApp _ (HaxeApp _ fn [dict']) [x]) [y])
     | isFnCompose dict' fn = do
         arg <- freshName
-        return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing x [JSApp Nothing y [JSVar Nothing arg]]])
+        return $ HaxeFunction ss Nothing [arg] (HaxeBlock ss [HaxeReturn Nothing $ HaxeApp Nothing x [HaxeApp Nothing y [HaxeVar Nothing arg]]])
     | isFnComposeFlipped dict' fn = do
         arg <- freshName
-        return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing y [JSApp Nothing x [JSVar Nothing arg]]])
+        return $ HaxeFunction ss Nothing [arg] (HaxeBlock ss [HaxeReturn Nothing $ HaxeApp Nothing y [HaxeApp Nothing x [HaxeVar Nothing arg]]])
   convert other = return other
-  isFnCompose :: JS -> JS -> Bool
+  isFnCompose :: Haxe -> Haxe -> Bool
   isFnCompose dict' fn = isDict semigroupoidFn dict' && isFn fnCompose fn
-  isFnComposeFlipped :: JS -> JS -> Bool
+  isFnComposeFlipped :: Haxe -> Haxe -> Bool
   isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isFn fnComposeFlipped fn
   fnCompose :: (String, String)
   fnCompose = (C.controlSemigroupoid, C.compose)

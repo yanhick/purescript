@@ -1,10 +1,10 @@
 -- |
 -- This module generates code in the simplified Javascript intermediate representation from Purescript code
 --
-module Language.PureScript.CodeGen.JS
+module Language.PureScript.CodeGen.Haxe
   ( module AST
   , module Common
-  , moduleToJs
+  , moduleToHaxe
   ) where
 
 import Prelude.Compat
@@ -22,9 +22,9 @@ import qualified Data.Map as M
 import qualified Data.Traversable as T
 
 import Language.PureScript.AST.SourcePos
-import Language.PureScript.CodeGen.JS.AST as AST
-import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.CodeGen.JS.Optimizer
+import Language.PureScript.CodeGen.Haxe.AST as AST
+import Language.PureScript.CodeGen.Haxe.Common as Common
+import Language.PureScript.CodeGen.Haxe.Optimizer
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
@@ -41,13 +41,13 @@ import System.FilePath.Posix ((</>))
 -- Generate code in the simplified Javascript intermediate representation for all declarations in a
 -- module.
 --
-moduleToJs
+moduleToHaxe
   :: forall m
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
   => Module Ann
-  -> Maybe JS
-  -> m [JS]
-moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
+  -> Maybe Haxe
+  -> m [Haxe]
+moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -57,15 +57,15 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     optimized <- T.traverse (T.traverse optimize) jsDecls
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
-    let strict = JSStringLiteral Nothing "use strict"
-    let header = if comments && not (null coms) then JSComment Nothing coms strict else strict
-    let foreign' = [JSVariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
+    let strict = HaxeStringLiteral Nothing "use strict"
+    let header = if comments && not (null coms) then HaxeComment Nothing coms strict else strict
+    let foreign' = [HaxeVariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
-    let exps' = JSObjectLiteral Nothing $ map (runIdent &&& JSVar Nothing . identToJs) standardExps
+    let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
                                ++ map (runIdent &&& foreignIdent) foreignExps
-    return $ moduleBody ++ [JSAssignment Nothing (JSAccessor Nothing "exports" (JSVar Nothing "module")) exps']
+    return $ moduleBody ++ [HaxeAssignment Nothing (HaxeAccessor Nothing "exports" (HaxeVar Nothing "module")) exps']
 
   where
 
@@ -103,11 +103,11 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- Generates Javascript code for a module import, binding the required module
   -- to the alternative
   --
-  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m JS
+  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m Haxe
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = JSApp Nothing (JSVar Nothing "require") [JSStringLiteral Nothing (".." </> runModuleName mn')]
-    withPos ss $ JSVariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
+    let moduleBody = HaxeApp Nothing (HaxeVar Nothing "require") [HaxeStringLiteral Nothing (".." </> runModuleName mn')]
+    withPos ss $ HaxeVariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- |
   -- Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -133,9 +133,9 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a declaration
   --
-  bindToJs :: Bind Ann -> m [JS]
-  bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
-  bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
+  bindToJs :: Bind Ann -> m [Haxe]
+  bindToJs (NonRec ann ident val) = return <$> nonRecToHaxe ann ident val
+  bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToHaxe)
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a single non-recursive
@@ -143,17 +143,17 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   --
   -- The main purpose of this function is to handle code generation for comments.
   --
-  nonRecToJS :: Ann -> Ident -> Expr Ann -> m JS
-  nonRecToJS a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
+  nonRecToHaxe :: Ann -> Ident -> Expr Ann -> m Haxe
+  nonRecToHaxe a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
     withoutComment <- asks optionsNoComments
     if withoutComment
-       then nonRecToJS a i (modifyAnn removeComments e)
-       else JSComment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
-  nonRecToJS (ss, _, _, _) ident val = do
+       then nonRecToHaxe a i (modifyAnn removeComments e)
+       else HaxeComment Nothing com <$> nonRecToHaxe a i (modifyAnn removeComments e)
+  nonRecToHaxe (ss, _, _, _) ident val = do
     js <- valueToJs val
-    withPos ss $ JSVariableIntroduction Nothing (identToJs ident) (Just js)
+    withPos ss $ HaxeVariableIntroduction Nothing (identToJs ident) (Just js)
 
-  withPos :: Maybe SourceSpan -> JS -> m JS
+  withPos :: Maybe SourceSpan -> Haxe -> m Haxe
   withPos (Just ss) js = do
     withSM <- asks optionsSourceMaps
     return $ if withSM
@@ -165,37 +165,37 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- Generate code in the simplified Javascript intermediate representation for a variable based on a
   -- PureScript identifier.
   --
-  var :: Ident -> JS
-  var = JSVar Nothing . identToJs
+  var :: Ident -> Haxe
+  var = HaxeVar Nothing . identToJs
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for an accessor based on
   -- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
   -- indexer is returned.
   --
-  accessor :: Ident -> JS -> JS
+  accessor :: Ident -> Haxe -> Haxe
   accessor (Ident prop) = accessorString prop
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
 
-  accessorString :: String -> JS -> JS
-  accessorString prop | identNeedsEscaping prop = JSIndexer Nothing (JSStringLiteral Nothing prop)
-                      | otherwise = JSAccessor Nothing prop
+  accessorString :: String -> Haxe -> Haxe
+  accessorString prop | identNeedsEscaping prop = HaxeIndexer Nothing (HaxeStringLiteral Nothing prop)
+                      | otherwise = HaxeAccessor Nothing prop
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a value or expression.
   --
-  valueToJs :: Expr Ann -> m JS
+  valueToJs :: Expr Ann -> m Haxe
   valueToJs e =
     let (ss, _, _, _) = extractAnn e in
     withPos ss =<< valueToJs' e
 
-  valueToJs' :: Expr Ann -> m JS
+  valueToJs' :: Expr Ann -> m Haxe
   valueToJs' (Literal (pos, _, _, _) l) =
-    maybe id rethrowWithPosition pos $ literalToValueJS l
+    maybe id rethrowWithPosition pos $ literalToValueHaxe l
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
-    return $ JSAccessor Nothing "value" $ qualifiedToJS id name
+    return $ HaxeAccessor Nothing "value" $ qualifiedToHaxe id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
-    return $ JSAccessor Nothing "create" $ qualifiedToJS id name
+    return $ HaxeAccessor Nothing "create" $ qualifiedToHaxe id name
   valueToJs' (Accessor _ prop val) =
     accessorString prop <$> valueToJs val
   valueToJs' (ObjectUpdate _ o ps) = do
@@ -204,27 +204,27 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     extendObj obj sts
   valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
     let args = unAbs e
-    in return $ JSFunction Nothing Nothing (map identToJs args) (JSBlock Nothing $ map assign args)
+    in return $ HaxeFunction Nothing Nothing (map identToJs args) (HaxeBlock Nothing $ map assign args)
     where
     unAbs :: Expr Ann -> [Ident]
     unAbs (Abs _ arg val) = arg : unAbs val
     unAbs _ = []
-    assign :: Ident -> JS
-    assign name = JSAssignment Nothing (accessorString (runIdent name) (JSVar Nothing "this"))
+    assign :: Ident -> Haxe
+    assign name = HaxeAssignment Nothing (accessorString (runIdent name) (HaxeVar Nothing "this"))
                                (var name)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
-    return $ JSFunction Nothing Nothing [identToJs arg] (JSBlock Nothing [JSReturn Nothing ret])
+    return $ HaxeFunction Nothing Nothing [identToJs arg] (HaxeBlock Nothing [HaxeReturn Nothing ret])
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
-        return $ JSUnary Nothing JSNew $ JSApp Nothing (qualifiedToJS id name) args'
+        return $ HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (qualifiedToHaxe id name) args'
       Var (_, _, _, Just IsTypeClassConstructor) name ->
-        return $ JSUnary Nothing JSNew $ JSApp Nothing (qualifiedToJS id name) args'
-      _ -> flip (foldl (\fn a -> JSApp Nothing fn [a])) args' <$> valueToJs f
+        return $ HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (qualifiedToHaxe id name) args'
+      _ -> flip (foldl (\fn a -> HaxeApp Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
     unApp (App _ val arg) args = unApp val (arg : args)
@@ -242,122 +242,122 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   valueToJs' (Let _ ds val) = do
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
-    return $ JSApp Nothing (JSFunction Nothing Nothing [] (JSBlock Nothing (ds' ++ [JSReturn Nothing ret]))) []
+    return $ HaxeApp Nothing (HaxeFunction Nothing Nothing [] (HaxeBlock Nothing (ds' ++ [HaxeReturn Nothing ret]))) []
   valueToJs' (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
-    return $ JSVariableIntroduction Nothing ctor (Just $
-                JSObjectLiteral Nothing [("create",
-                  JSFunction Nothing Nothing ["value"]
-                    (JSBlock Nothing [JSReturn Nothing $ JSVar Nothing "value"]))])
+    return $ HaxeVariableIntroduction Nothing ctor (Just $
+                HaxeObjectLiteral Nothing [("create",
+                  HaxeFunction Nothing Nothing ["value"]
+                    (HaxeBlock Nothing [HaxeReturn Nothing $ HaxeVar Nothing "value"]))])
   valueToJs' (Constructor _ _ (ProperName ctor) []) =
-    return $ iife ctor [ JSFunction Nothing (Just ctor) [] (JSBlock Nothing [])
-           , JSAssignment Nothing (JSAccessor Nothing "value" (JSVar Nothing ctor))
-                (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing ctor) []) ]
+    return $ iife ctor [ HaxeFunction Nothing (Just ctor) [] (HaxeBlock Nothing [])
+           , HaxeAssignment Nothing (HaxeAccessor Nothing "value" (HaxeVar Nothing ctor))
+                (HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) []) ]
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
-          let body = [ JSAssignment Nothing (JSAccessor Nothing (identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
-          in JSFunction Nothing (Just ctor) (identToJs `map` fields) (JSBlock Nothing body)
+          let body = [ HaxeAssignment Nothing (HaxeAccessor Nothing (identToJs f) (HaxeVar Nothing "this")) (var f) | f <- fields ]
+          in HaxeFunction Nothing (Just ctor) (identToJs `map` fields) (HaxeBlock Nothing body)
         createFn =
-          let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing ctor) (var `map` fields)
-          in foldr (\f inner -> JSFunction Nothing Nothing [identToJs f] (JSBlock Nothing [JSReturn Nothing inner])) body fields
+          let body = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) (var `map` fields)
+          in foldr (\f inner -> HaxeFunction Nothing Nothing [identToJs f] (HaxeBlock Nothing [HaxeReturn Nothing inner])) body fields
     in return $ iife ctor [ constructor
-                          , JSAssignment Nothing (JSAccessor Nothing "create" (JSVar Nothing ctor)) createFn
+                          , HaxeAssignment Nothing (HaxeAccessor Nothing "create" (HaxeVar Nothing ctor)) createFn
                           ]
 
-  iife :: String -> [JS] -> JS
-  iife v exprs = JSApp Nothing (JSFunction Nothing Nothing [] (JSBlock Nothing $ exprs ++ [JSReturn Nothing $ JSVar Nothing v])) []
+  iife :: String -> [Haxe] -> Haxe
+  iife v exprs = HaxeApp Nothing (HaxeFunction Nothing Nothing [] (HaxeBlock Nothing $ exprs ++ [HaxeReturn Nothing $ HaxeVar Nothing v])) []
 
-  literalToValueJS :: Literal (Expr Ann) -> m JS
-  literalToValueJS (NumericLiteral (Left i)) = return $ JSNumericLiteral Nothing (Left i)
-  literalToValueJS (NumericLiteral (Right n)) = return $ JSNumericLiteral Nothing (Right n)
-  literalToValueJS (StringLiteral s) = return $ JSStringLiteral Nothing s
-  literalToValueJS (CharLiteral c) = return $ JSStringLiteral Nothing [c]
-  literalToValueJS (BooleanLiteral b) = return $ JSBooleanLiteral Nothing b
-  literalToValueJS (ArrayLiteral xs) = JSArrayLiteral Nothing <$> mapM valueToJs xs
-  literalToValueJS (ObjectLiteral ps) = JSObjectLiteral Nothing <$> mapM (sndM valueToJs) ps
+  literalToValueHaxe :: Literal (Expr Ann) -> m Haxe
+  literalToValueHaxe (NumericLiteral (Left i)) = return $ HaxeNumericLiteral Nothing (Left i)
+  literalToValueHaxe (NumericLiteral (Right n)) = return $ HaxeNumericLiteral Nothing (Right n)
+  literalToValueHaxe (StringLiteral s) = return $ HaxeStringLiteral Nothing s
+  literalToValueHaxe (CharLiteral c) = return $ HaxeStringLiteral Nothing [c]
+  literalToValueHaxe (BooleanLiteral b) = return $ HaxeBooleanLiteral Nothing b
+  literalToValueHaxe (ArrayLiteral xs) = HaxeArrayLiteral Nothing <$> mapM valueToJs xs
+  literalToValueHaxe (ObjectLiteral ps) = HaxeObjectLiteral Nothing <$> mapM (sndM valueToJs) ps
 
   -- |
   -- Shallow copy an object.
   --
-  extendObj :: JS -> [(String, JS)] -> m JS
+  extendObj :: Haxe -> [(String, Haxe)] -> m Haxe
   extendObj obj sts = do
     newObj <- freshName
     key <- freshName
     evaluatedObj <- freshName
     let
-      jsKey = JSVar Nothing key
-      jsNewObj = JSVar Nothing newObj
-      jsEvaluatedObj = JSVar Nothing evaluatedObj
-      block = JSBlock Nothing (evaluate:objAssign:copy:extend ++ [JSReturn Nothing jsNewObj])
-      evaluate = JSVariableIntroduction Nothing evaluatedObj (Just obj)
-      objAssign = JSVariableIntroduction Nothing newObj (Just $ JSObjectLiteral Nothing [])
-      copy = JSForIn Nothing key jsEvaluatedObj $ JSBlock Nothing [JSIfElse Nothing cond assign Nothing]
-      cond = JSApp Nothing (JSAccessor Nothing "hasOwnProperty" jsEvaluatedObj) [jsKey]
-      assign = JSBlock Nothing [JSAssignment Nothing (JSIndexer Nothing jsKey jsNewObj) (JSIndexer Nothing jsKey jsEvaluatedObj)]
-      stToAssign (s, js) = JSAssignment Nothing (accessorString s jsNewObj) js
+      jsKey = HaxeVar Nothing key
+      jsNewObj = HaxeVar Nothing newObj
+      jsEvaluatedObj = HaxeVar Nothing evaluatedObj
+      block = HaxeBlock Nothing (evaluate:objAssign:copy:extend ++ [HaxeReturn Nothing jsNewObj])
+      evaluate = HaxeVariableIntroduction Nothing evaluatedObj (Just obj)
+      objAssign = HaxeVariableIntroduction Nothing newObj (Just $ HaxeObjectLiteral Nothing [])
+      copy = HaxeForIn Nothing key jsEvaluatedObj $ HaxeBlock Nothing [HaxeIfElse Nothing cond assign Nothing]
+      cond = HaxeApp Nothing (HaxeAccessor Nothing "hasOwnProperty" jsEvaluatedObj) [jsKey]
+      assign = HaxeBlock Nothing [HaxeAssignment Nothing (HaxeIndexer Nothing jsKey jsNewObj) (HaxeIndexer Nothing jsKey jsEvaluatedObj)]
+      stToAssign (s, js) = HaxeAssignment Nothing (accessorString s jsNewObj) js
       extend = map stToAssign sts
-    return $ JSApp Nothing (JSFunction Nothing Nothing [] block) []
+    return $ HaxeApp Nothing (HaxeFunction Nothing Nothing [] block) []
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a reference to a
   -- variable.
   --
-  varToJs :: Qualified Ident -> JS
+  varToJs :: Qualified Ident -> Haxe
   varToJs (Qualified Nothing ident) = var ident
-  varToJs qual = qualifiedToJS id qual
+  varToJs qual = qualifiedToHaxe id qual
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   --
-  qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
-  qualifiedToJS f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = JSVar Nothing . runIdent $ f a
-  qualifiedToJS f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (JSVar Nothing (moduleNameToJs mn'))
-  qualifiedToJS f (Qualified _ a) = JSVar Nothing $ identToJs (f a)
+  qualifiedToHaxe :: (a -> Ident) -> Qualified a -> Haxe
+  qualifiedToHaxe f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = HaxeVar Nothing . runIdent $ f a
+  qualifiedToHaxe f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (HaxeVar Nothing (moduleNameToJs mn'))
+  qualifiedToHaxe f (Qualified _ a) = HaxeVar Nothing $ identToJs (f a)
 
-  foreignIdent :: Ident -> JS
-  foreignIdent ident = accessorString (runIdent ident) (JSVar Nothing "$foreign")
+  foreignIdent :: Ident -> Haxe
+  foreignIdent ident = accessorString (runIdent ident) (HaxeVar Nothing "$foreign")
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for pattern match binders
   -- and guards.
   --
-  bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [JS] -> m JS
+  bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [Haxe] -> m Haxe
   bindersToJs maybeSpan binders vals = do
     valNames <- replicateM (length vals) freshName
-    let assignments = zipWith (JSVariableIntroduction Nothing) valNames (map Just vals)
+    let assignments = zipWith (HaxeVariableIntroduction Nothing) valNames (map Just vals)
     jss <- forM binders $ \(CaseAlternative bs result) -> do
       ret <- guardsToJs result
       go valNames ret bs
-    return $ JSApp Nothing (JSFunction Nothing Nothing [] (JSBlock Nothing (assignments ++ concat jss ++ [JSThrow Nothing $ failedPatternError valNames])))
+    return $ HaxeApp Nothing (HaxeFunction Nothing Nothing [] (HaxeBlock Nothing (assignments ++ concat jss ++ [HaxeThrow Nothing $ failedPatternError valNames])))
                    []
     where
-      go :: [String] -> [JS] -> [Binder Ann] -> m [JS]
+      go :: [String] -> [Haxe] -> [Binder Ann] -> m [Haxe]
       go _ done [] = return done
       go (v:vs) done' (b:bs) = do
         done'' <- go vs done' bs
         binderToJs v done'' b
       go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
-      failedPatternError :: [String] -> JS
-      failedPatternError names = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing "Error") [JSBinary Nothing Add (JSStringLiteral Nothing failedPatternMessage) (JSArrayLiteral Nothing $ zipWith valueError names vals)]
+      failedPatternError :: [String] -> Haxe
+      failedPatternError names = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing "Error") [HaxeBinary Nothing Add (HaxeStringLiteral Nothing failedPatternMessage) (HaxeArrayLiteral Nothing $ zipWith valueError names vals)]
 
       failedPatternMessage :: String
       failedPatternMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan ++ ": "
 
-      valueError :: String -> JS -> JS
-      valueError _ l@(JSNumericLiteral _ _) = l
-      valueError _ l@(JSStringLiteral _ _)  = l
-      valueError _ l@(JSBooleanLiteral _ _) = l
-      valueError s _                        = JSAccessor Nothing "name" . JSAccessor Nothing "constructor" $ JSVar Nothing s
+      valueError :: String -> Haxe -> Haxe
+      valueError _ l@(HaxeNumericLiteral _ _) = l
+      valueError _ l@(HaxeStringLiteral _ _)  = l
+      valueError _ l@(HaxeBooleanLiteral _ _) = l
+      valueError s _                        = HaxeAccessor Nothing "name" . HaxeAccessor Nothing "constructor" $ HaxeVar Nothing s
 
-      guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
+      guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [Haxe]
       guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
         cond' <- valueToJs cond
         done  <- valueToJs val
-        return $ JSIfElse Nothing cond' (JSBlock Nothing [JSReturn Nothing done]) Nothing
-      guardsToJs (Right v) = return . JSReturn Nothing <$> valueToJs v
+        return $ HaxeIfElse Nothing cond' (HaxeBlock Nothing [HaxeReturn Nothing done]) Nothing
+      guardsToJs (Right v) = return . HaxeReturn Nothing <$> valueToJs v
 
-  binderToJs :: String -> [JS] -> Binder Ann -> m [JS]
+  binderToJs :: String -> [Haxe] -> Binder Ann -> m [Haxe]
   binderToJs s done binder =
     let (ss, _, _, _) = extractBinderAnn binder in
     traverse (withPos ss) =<< binderToJs' s done binder
@@ -366,12 +366,12 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- Generate code in the simplified Javascript intermediate representation for a pattern match
   -- binder.
   --
-  binderToJs' :: String -> [JS] -> Binder Ann -> m [JS]
+  binderToJs' :: String -> [Haxe] -> Binder Ann -> m [Haxe]
   binderToJs' _ done NullBinder{} = return done
   binderToJs' varName done (LiteralBinder _ l) =
-    literalToBinderJS varName done l
+    literalToBinderHaxe varName done l
   binderToJs' varName done (VarBinder _ ident) =
-    return (JSVariableIntroduction Nothing (identToJs ident) (Just (JSVar Nothing varName)) : done)
+    return (HaxeVariableIntroduction Nothing (identToJs ident) (Just (HaxeVar Nothing varName)) : done)
   binderToJs' varName done (ConstructorBinder (_, _, _, Just IsNewtype) _ _ [b]) =
     binderToJs varName done b
   binderToJs' varName done (ConstructorBinder (_, _, _, Just (IsConstructor ctorType fields)) _ ctor bs) = do
@@ -379,68 +379,68 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     return $ case ctorType of
       ProductType -> js
       SumType ->
-        [JSIfElse Nothing (JSInstanceOf Nothing (JSVar Nothing varName) (qualifiedToJS (Ident . runProperName) ctor))
-                  (JSBlock Nothing js)
+        [HaxeIfElse Nothing (HaxeInstanceOf Nothing (HaxeVar Nothing varName) (qualifiedToHaxe (Ident . runProperName) ctor))
+                  (HaxeBlock Nothing js)
                   Nothing]
     where
-    go :: [(Ident, Binder Ann)] -> [JS] -> m [JS]
+    go :: [(Ident, Binder Ann)] -> [Haxe] -> m [Haxe]
     go [] done' = return done'
     go ((field, binder) : remain) done' = do
       argVar <- freshName
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
-      return (JSVariableIntroduction Nothing argVar (Just (JSAccessor Nothing (identToJs field) (JSVar Nothing varName))) : js)
+      return (HaxeVariableIntroduction Nothing argVar (Just (HaxeAccessor Nothing (identToJs field) (HaxeVar Nothing varName))) : js)
   binderToJs' _ _ ConstructorBinder{} =
     internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs' varName done (NamedBinder _ ident binder) = do
     js <- binderToJs varName done binder
-    return (JSVariableIntroduction Nothing (identToJs ident) (Just (JSVar Nothing varName)) : js)
+    return (HaxeVariableIntroduction Nothing (identToJs ident) (Just (HaxeVar Nothing varName)) : js)
 
-  literalToBinderJS :: String -> [JS] -> Literal (Binder Ann) -> m [JS]
-  literalToBinderJS varName done (NumericLiteral num) =
-    return [JSIfElse Nothing (JSBinary Nothing EqualTo (JSVar Nothing varName) (JSNumericLiteral Nothing num)) (JSBlock Nothing done) Nothing]
-  literalToBinderJS varName done (CharLiteral c) =
-    return [JSIfElse Nothing (JSBinary Nothing EqualTo (JSVar Nothing varName) (JSStringLiteral Nothing [c])) (JSBlock Nothing done) Nothing]
-  literalToBinderJS varName done (StringLiteral str) =
-    return [JSIfElse Nothing (JSBinary Nothing EqualTo (JSVar Nothing varName) (JSStringLiteral Nothing str)) (JSBlock Nothing done) Nothing]
-  literalToBinderJS varName done (BooleanLiteral True) =
-    return [JSIfElse Nothing (JSVar Nothing varName) (JSBlock Nothing done) Nothing]
-  literalToBinderJS varName done (BooleanLiteral False) =
-    return [JSIfElse Nothing (JSUnary Nothing Not (JSVar Nothing varName)) (JSBlock Nothing done) Nothing]
-  literalToBinderJS varName done (ObjectLiteral bs) = go done bs
+  literalToBinderHaxe :: String -> [Haxe] -> Literal (Binder Ann) -> m [Haxe]
+  literalToBinderHaxe varName done (NumericLiteral num) =
+    return [HaxeIfElse Nothing (HaxeBinary Nothing EqualTo (HaxeVar Nothing varName) (HaxeNumericLiteral Nothing num)) (HaxeBlock Nothing done) Nothing]
+  literalToBinderHaxe varName done (CharLiteral c) =
+    return [HaxeIfElse Nothing (HaxeBinary Nothing EqualTo (HaxeVar Nothing varName) (HaxeStringLiteral Nothing [c])) (HaxeBlock Nothing done) Nothing]
+  literalToBinderHaxe varName done (StringLiteral str) =
+    return [HaxeIfElse Nothing (HaxeBinary Nothing EqualTo (HaxeVar Nothing varName) (HaxeStringLiteral Nothing str)) (HaxeBlock Nothing done) Nothing]
+  literalToBinderHaxe varName done (BooleanLiteral True) =
+    return [HaxeIfElse Nothing (HaxeVar Nothing varName) (HaxeBlock Nothing done) Nothing]
+  literalToBinderHaxe varName done (BooleanLiteral False) =
+    return [HaxeIfElse Nothing (HaxeUnary Nothing Not (HaxeVar Nothing varName)) (HaxeBlock Nothing done) Nothing]
+  literalToBinderHaxe varName done (ObjectLiteral bs) = go done bs
     where
-    go :: [JS] -> [(String, Binder Ann)] -> m [JS]
+    go :: [Haxe] -> [(String, Binder Ann)] -> m [Haxe]
     go done' [] = return done'
     go done' ((prop, binder):bs') = do
       propVar <- freshName
       done'' <- go done' bs'
       js <- binderToJs propVar done'' binder
-      return (JSVariableIntroduction Nothing propVar (Just (accessorString prop (JSVar Nothing varName))) : js)
-  literalToBinderJS varName done (ArrayLiteral bs) = do
+      return (HaxeVariableIntroduction Nothing propVar (Just (accessorString prop (HaxeVar Nothing varName))) : js)
+  literalToBinderHaxe varName done (ArrayLiteral bs) = do
     js <- go done 0 bs
-    return [JSIfElse Nothing (JSBinary Nothing EqualTo (JSAccessor Nothing "length" (JSVar Nothing varName)) (JSNumericLiteral Nothing (Left (fromIntegral $ length bs)))) (JSBlock Nothing js) Nothing]
+    return [HaxeIfElse Nothing (HaxeBinary Nothing EqualTo (HaxeAccessor Nothing "length" (HaxeVar Nothing varName)) (HaxeNumericLiteral Nothing (Left (fromIntegral $ length bs)))) (HaxeBlock Nothing js) Nothing]
     where
-    go :: [JS] -> Integer -> [Binder Ann] -> m [JS]
+    go :: [Haxe] -> Integer -> [Binder Ann] -> m [Haxe]
     go done' _ [] = return done'
     go done' index (binder:bs') = do
       elVar <- freshName
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
-      return (JSVariableIntroduction Nothing elVar (Just (JSIndexer Nothing (JSNumericLiteral Nothing (Left index)) (JSVar Nothing varName))) : js)
+      return (HaxeVariableIntroduction Nothing elVar (Just (HaxeIndexer Nothing (HaxeNumericLiteral Nothing (Left index)) (HaxeVar Nothing varName))) : js)
 
   -- Check that all integers fall within the valid int range for JavaScript.
-  checkIntegers :: JS -> m ()
-  checkIntegers = void . everywhereOnJSTopDownM go
+  checkIntegers :: Haxe -> m ()
+  checkIntegers = void . everywhereOnHaxeTopDownM go
     where
-    go :: JS -> m JS
-    go (JSUnary _ Negate (JSNumericLiteral ss (Left i))) =
+    go :: Haxe -> m Haxe
+    go (HaxeUnary _ Negate (HaxeNumericLiteral ss (Left i))) =
       -- Move the negation inside the literal; since this is a top-down
       -- traversal doing this replacement will stop the next case from raising
       -- the error when attempting to use -2147483648, as if left unrewritten
-      -- the value is `JSUnary Negate (JSNumericLiteral (Left 2147483648))`, and
+      -- the value is `HaxeUnary Negate (HaxeNumericLiteral (Left 2147483648))`, and
       -- 2147483648 is larger than the maximum allowed int.
-      return $ JSNumericLiteral ss (Left (-i))
-    go js@(JSNumericLiteral _ (Left i)) =
+      return $ HaxeNumericLiteral ss (Left (-i))
+    go js@(HaxeNumericLiteral _ (Left i)) =
       let minInt = -2147483648
           maxInt = 2147483647
       in if i < minInt || i > maxInt

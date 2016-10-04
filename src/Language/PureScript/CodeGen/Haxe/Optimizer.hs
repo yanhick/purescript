@@ -19,31 +19,31 @@
 --
 --  * Inlining primitive Javascript operators
 --
-module Language.PureScript.CodeGen.JS.Optimizer (optimize) where
+module Language.PureScript.CodeGen.Haxe.Optimizer (optimize) where
 
 import Prelude.Compat
 
 import Control.Monad.Reader (MonadReader, ask, asks)
 import Control.Monad.Supply.Class (MonadSupply)
 
-import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.JS.Optimizer.Blocks
-import Language.PureScript.CodeGen.JS.Optimizer.Common
-import Language.PureScript.CodeGen.JS.Optimizer.Inliner
-import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
-import Language.PureScript.CodeGen.JS.Optimizer.TCO
-import Language.PureScript.CodeGen.JS.Optimizer.Unused
+import Language.PureScript.CodeGen.Haxe.AST
+import Language.PureScript.CodeGen.Haxe.Optimizer.Blocks
+import Language.PureScript.CodeGen.Haxe.Optimizer.Common
+import Language.PureScript.CodeGen.Haxe.Optimizer.Inliner
+import Language.PureScript.CodeGen.Haxe.Optimizer.MagicDo
+import Language.PureScript.CodeGen.Haxe.Optimizer.TCO
+import Language.PureScript.CodeGen.Haxe.Optimizer.Unused
 import Language.PureScript.Options
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (MonadReader Options m, MonadSupply m) => JS -> m JS
+optimize :: (MonadReader Options m, MonadSupply m) => Haxe -> m Haxe
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (MonadReader Options m, MonadSupply m) => JS -> m JS
+optimize' :: (MonadReader Options m, MonadSupply m) => Haxe -> m Haxe
 optimize' js = do
   opts <- ask
   js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
@@ -52,7 +52,7 @@ optimize' js = do
     ]) js
   untilFixedPoint (return . tidyUp) . tco opts . magicDo opts $ js'
   where
-  tidyUp :: JS -> JS
+  tidyUp :: Haxe -> Haxe
   tidyUp = applyAll
     [ collapseNestedBlocks
     , collapseNestedIfs

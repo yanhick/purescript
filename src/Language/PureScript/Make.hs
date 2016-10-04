@@ -69,7 +69,7 @@ import Language.PureScript.Sugar
 import Language.PureScript.TypeChecker
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.CodeGen.JS as J
+import qualified Language.PureScript.CodeGen.Haxe as H
 import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
@@ -352,13 +352,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             return Nothing
         | otherwise -> do
             checkForeignDecls m path
-            return $ Just $ J.JSApp Nothing (J.JSVar Nothing "require") [J.JSStringLiteral Nothing "./foreign"]
+            return $ Just $ H.HaxeApp Nothing (H.HaxeVar Nothing "require") [H.HaxeStringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
-    rawJs <- J.moduleToJs m foreignInclude
+    rawJs <- H.moduleToHaxe m foreignInclude
     dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
     sourceMaps <- lift $ asks optionsSourceMaps
-    let (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])
+    let (pjs, mappings) = if sourceMaps then prettyPrintHaxeWithSourceMaps rawJs else (prettyPrintHaxe rawJs, [])
     let filePath = runModuleName mn
         jsFile = outputDir </> filePath </> "index.js"
         mapFile = outputDir </> filePath </> "index.js.map"
