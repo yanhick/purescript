@@ -131,6 +131,13 @@ literals = mkPattern' match'
   match (HaxeRaw _ js) = return $ emit js
   match (HaxeImport _ i) = return $ emit ("import " <> i)
   match (HaxePackage _ p) = return $ emit ("package " <> p)
+  match (HaxeClass _ n sts) = mconcat <$> sequence
+    [ return $ emit ("class " ++ n ++ " {\n")
+    , withIndent $ prettyStatements sts
+    , return $ emit "\n"
+    , currentIndent
+    , return $ emit "}"
+    ]
   match _ = mzero
 
 string :: (Emit gen) => String -> gen

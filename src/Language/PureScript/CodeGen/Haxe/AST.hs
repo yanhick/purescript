@@ -192,6 +192,10 @@ data Haxe
   --
   | HaxePackage (Maybe SourceSpan) String
   -- |
+  -- A class declaration and content
+  --
+  | HaxeClass (Maybe SourceSpan) String [Haxe]
+  -- |
   -- A top level import
   --
   | HaxeAssignment (Maybe SourceSpan) Haxe Haxe
@@ -276,6 +280,7 @@ withSourceSpan withSpan = go
   go (HaxeComment _ com j) = HaxeComment ss com j
   go (HaxeImport _ i) = HaxeImport ss i
   go (HaxePackage _ p) = HaxePackage ss p
+  go (HaxeClass _ c1 c2) = HaxeClass ss c1 c2
 
 getSourceSpan :: Haxe -> Maybe SourceSpan
 getSourceSpan = go
@@ -310,6 +315,7 @@ getSourceSpan = go
   go (HaxeComment ss _ _) = ss
   go (HaxeImport ss _) = ss
   go (HaxePackage ss _) = ss
+  go (HaxeClass ss _ _) = ss
 
 --
 -- Traversals
