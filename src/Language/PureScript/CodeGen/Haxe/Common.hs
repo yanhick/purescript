@@ -11,9 +11,9 @@ import Data.List (intercalate)
 import Language.PureScript.Crash
 import Language.PureScript.Names
 
-moduleNameToJs :: ModuleName -> String
-moduleNameToJs (ModuleName pns) =
-  let name = intercalate "_" (runProperName `map` pns)
+moduleNameToHaxe :: ModuleName -> String
+moduleNameToHaxe (ModuleName pns) =
+  let name = intercalate "." (runProperName `map` pns)
   in if nameIsJsBuiltIn name then "$$" ++ name else name
 
 -- |

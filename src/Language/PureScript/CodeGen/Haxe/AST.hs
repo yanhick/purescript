@@ -184,17 +184,21 @@ data Haxe
   --
   | HaxeVariableIntroduction (Maybe SourceSpan) String (Maybe Haxe)
   -- |
-  -- A variable assignment
+  -- A top level import
+  --
+  | HaxeImport (Maybe SourceSpan) String
+  -- |
+  -- A package declaration
+  --
+  | HaxePackage (Maybe SourceSpan) String
+  -- |
+  -- A top level import
   --
   | HaxeAssignment (Maybe SourceSpan) Haxe Haxe
   -- |
   -- While loop
   --
   | HaxeWhile (Maybe SourceSpan) Haxe Haxe
-  -- |
-  -- For loop
-  --
-  | HaxeFor (Maybe SourceSpan) String Haxe Haxe Haxe
   -- |
   -- ForIn loop
   --
@@ -219,10 +223,6 @@ data Haxe
   -- InstanceOf test
   --
   | HaxeInstanceOf (Maybe SourceSpan) Haxe Haxe
-  -- |
-  -- Labelled statement
-  --
-  | HaxeLabel (Maybe SourceSpan) String Haxe
   -- |
   -- Break statement
   --
@@ -264,18 +264,18 @@ withSourceSpan withSpan = go
   go (HaxeVariableIntroduction _ name j) = HaxeVariableIntroduction ss name j
   go (HaxeAssignment _ j1 j2) = HaxeAssignment ss j1 j2
   go (HaxeWhile _ j1 j2) = HaxeWhile ss j1 j2
-  go (HaxeFor _ name j1 j2 j3) = HaxeFor ss name j1 j2 j3
   go (HaxeForIn _ name j1 j2) = HaxeForIn ss name j1 j2
   go (HaxeIfElse _ j1 j2 j3) = HaxeIfElse ss j1 j2 j3
   go (HaxeReturn _ js) = HaxeReturn ss js
   go (HaxeThrow _ js) = HaxeThrow ss js
   go (HaxeTypeOf _ js) = HaxeTypeOf ss js
   go (HaxeInstanceOf _ j1 j2) = HaxeInstanceOf ss j1 j2
-  go (HaxeLabel _ name js) = HaxeLabel ss name js
   go (HaxeBreak _ s) = HaxeBreak ss s
   go (HaxeContinue _ s) = HaxeContinue ss s
   go (HaxeRaw _ s) = HaxeRaw ss s
   go (HaxeComment _ com j) = HaxeComment ss com j
+  go (HaxeImport _ i) = HaxeImport ss i
+  go (HaxePackage _ p) = HaxePackage ss p
 
 getSourceSpan :: Haxe -> Maybe SourceSpan
 getSourceSpan = go
@@ -298,18 +298,18 @@ getSourceSpan = go
   go (HaxeVariableIntroduction ss _ _) = ss
   go (HaxeAssignment ss _ _) = ss
   go (HaxeWhile ss _ _) = ss
-  go (HaxeFor ss _ _ _ _) = ss
   go (HaxeForIn ss _ _ _) = ss
   go (HaxeIfElse ss _ _ _) = ss
   go (HaxeReturn ss _) = ss
   go (HaxeThrow ss _) = ss
   go (HaxeTypeOf ss _) = ss
   go (HaxeInstanceOf ss _ _) = ss
-  go (HaxeLabel ss _ _) = ss
   go (HaxeBreak ss _) = ss
   go (HaxeContinue ss _) = ss
   go (HaxeRaw ss _) = ss
   go (HaxeComment ss _ _) = ss
+  go (HaxeImport ss _) = ss
+  go (HaxePackage ss _) = ss
 
 --
 -- Traversals
@@ -332,13 +332,11 @@ everywhereOnHaxe f = go
   go (HaxeVariableIntroduction ss name j) = f (HaxeVariableIntroduction ss name (fmap go j))
   go (HaxeAssignment ss j1 j2) = f (HaxeAssignment ss (go j1) (go j2))
   go (HaxeWhile ss j1 j2) = f (HaxeWhile ss (go j1) (go j2))
-  go (HaxeFor ss name j1 j2 j3) = f (HaxeFor ss name (go j1) (go j2) (go j3))
   go (HaxeForIn ss name j1 j2) = f (HaxeForIn ss name (go j1) (go j2))
   go (HaxeIfElse ss j1 j2 j3) = f (HaxeIfElse ss (go j1) (go j2) (fmap go j3))
   go (HaxeReturn ss js) = f (HaxeReturn ss (go js))
   go (HaxeThrow ss js) = f (HaxeThrow ss (go js))
   go (HaxeTypeOf ss js) = f (HaxeTypeOf ss (go js))
-  go (HaxeLabel ss name js) = f (HaxeLabel ss name (go js))
   go (HaxeInstanceOf ss j1 j2) = f (HaxeInstanceOf ss (go j1) (go j2))
   go (HaxeComment ss com j) = f (HaxeComment ss com (go j))
   go other = f other
@@ -363,13 +361,11 @@ everywhereOnHaxeTopDownM f = f >=> go
   go (HaxeVariableIntroduction ss name j) = HaxeVariableIntroduction ss name <$> traverse f' j
   go (HaxeAssignment ss j1 j2) = HaxeAssignment ss <$> f' j1 <*> f' j2
   go (HaxeWhile ss j1 j2) = HaxeWhile ss <$> f' j1 <*> f' j2
-  go (HaxeFor ss name j1 j2 j3) = HaxeFor ss name <$> f' j1 <*> f' j2 <*> f' j3
   go (HaxeForIn ss name j1 j2) = HaxeForIn ss name <$> f' j1 <*> f' j2
   go (HaxeIfElse ss j1 j2 j3) = HaxeIfElse ss <$> f' j1 <*> f' j2 <*> traverse f' j3
   go (HaxeReturn ss j) = HaxeReturn ss <$> f' j
   go (HaxeThrow ss j) = HaxeThrow ss <$> f' j
   go (HaxeTypeOf ss j) = HaxeTypeOf ss <$> f' j
-  go (HaxeLabel ss name j) = HaxeLabel ss name <$> f' j
   go (HaxeInstanceOf ss j1 j2) = HaxeInstanceOf ss <$> f' j1 <*> f' j2
   go (HaxeComment ss com j) = HaxeComment ss com <$> f' j
   go other = f other
@@ -390,14 +386,12 @@ everythingOnHaxe (<>) f = go
   go j@(HaxeVariableIntroduction _ _ (Just j1)) = f j <> go j1
   go j@(HaxeAssignment _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeWhile _ j1 j2) = f j <> go j1 <> go j2
-  go j@(HaxeFor _ _ j1 j2 j3) = f j <> go j1 <> go j2 <> go j3
   go j@(HaxeForIn _ _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeIfElse _ j1 j2 Nothing) = f j <> go j1 <> go j2
   go j@(HaxeIfElse _ j1 j2 (Just j3)) = f j <> go j1 <> go j2 <> go j3
   go j@(HaxeReturn _ j1) = f j <> go j1
   go j@(HaxeThrow _ j1) = f j <> go j1
   go j@(HaxeTypeOf _ j1) = f j <> go j1
-  go j@(HaxeLabel _ _ j1) = f j <> go j1
   go j@(HaxeInstanceOf _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeComment _ _ j1) = f j <> go j1
   go other = f other

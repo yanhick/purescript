@@ -79,14 +79,6 @@ literals = mkPattern' match'
     , return $ emit ") "
     , prettyPrintHaxe' sts
     ]
-  match (HaxeFor _ ident start end sts) = mconcat <$> sequence
-    [ return $ emit $ "for (var " ++ ident ++ " = "
-    , prettyPrintHaxe' start
-    , return $ emit $ "; " ++ ident ++ " < "
-    , prettyPrintHaxe' end
-    , return $ emit $ "; " ++ ident ++ "++) "
-    , prettyPrintHaxe' sts
-    ]
   match (HaxeForIn _ ident obj sts) = mconcat <$> sequence
     [ return $ emit $ "for (var " ++ ident ++ " in "
     , prettyPrintHaxe' obj
@@ -110,10 +102,6 @@ literals = mkPattern' match'
     ]
   match (HaxeBreak _ lbl) = return $ emit $ "break " ++ lbl
   match (HaxeContinue _ lbl) = return $ emit $ "continue " ++ lbl
-  match (HaxeLabel _ lbl js) = mconcat <$> sequence
-    [ return $ emit $ lbl ++ ": "
-    , prettyPrintHaxe' js
-    ]
   match (HaxeComment _ com js) = fmap mconcat $ sequence $
     [ return $ emit "\n"
     , currentIndent
@@ -141,6 +129,8 @@ literals = mkPattern' match'
 
     removeComments [] = []
   match (HaxeRaw _ js) = return $ emit js
+  match (HaxeImport _ i) = return $ emit ("import " <> i)
+  match (HaxePackage _ p) = return $ emit ("package " <> p)
   match _ = mzero
 
 string :: (Emit gen) => String -> gen

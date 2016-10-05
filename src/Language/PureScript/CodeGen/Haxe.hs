@@ -1,5 +1,5 @@
 -- |
--- This module generates code in the simplified Javascript intermediate representation from Purescript code
+-- This module generates code in the simplified Haxe intermediate representation from Purescript code
 --
 module Language.PureScript.CodeGen.Haxe
   ( module AST
@@ -24,7 +24,6 @@ import qualified Data.Traversable as T
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.Haxe.AST as AST
 import Language.PureScript.CodeGen.Haxe.Common as Common
-import Language.PureScript.CodeGen.Haxe.Optimizer
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
@@ -38,7 +37,7 @@ import qualified Language.PureScript.Constants as C
 import System.FilePath.Posix ((</>))
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for all declarations in a
+-- Generate code in the simplified Haxe intermediate representation for all declarations in a
 -- module.
 --
 moduleToHaxe
@@ -51,16 +50,16 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
+    haxeImports <- T.traverse (importToHaxe mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
     let decls' = renameModules mnLookup decls
-    jsDecls <- mapM bindToJs decls'
-    optimized <- T.traverse (T.traverse optimize) jsDecls
-    F.traverse_ (F.traverse_ checkIntegers) optimized
+    haxeDecls <- mapM bindToJs decls'
+    F.traverse_ (F.traverse_ checkIntegers) haxeDecls
     comments <- not <$> asks optionsNoComments
+    let package = HaxePackage Nothing (moduleNameToHaxe mn)
     let strict = HaxeStringLiteral Nothing "use strict"
     let header = if comments && not (null coms) then HaxeComment Nothing coms strict else strict
     let foreign' = [HaxeVariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
-    let moduleBody = header : foreign' ++ jsImports ++ concat optimized
+    let moduleBody = header : package : foreign' ++ haxeImports ++ concat haxeDecls
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
@@ -100,14 +99,13 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
          else newName
 
   -- |
-  -- Generates Javascript code for a module import, binding the required module
+  -- Generates Haxe code for a module import, binding the required module
   -- to the alternative
   --
-  importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m Haxe
-  importToJs mnLookup mn' = do
+  importToHaxe :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m Haxe
+  importToHaxe mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = HaxeApp Nothing (HaxeVar Nothing "require") [HaxeStringLiteral Nothing (".." </> runModuleName mn')]
-    withPos ss $ HaxeVariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
+    withPos ss $ HaxeImport Nothing (moduleNameToHaxe mnSafe)
 
   -- |
   -- Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -131,14 +129,14 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     renameQual q = q
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a declaration
+  -- Generate code in the simplified Haxe intermediate representation for a declaration
   --
   bindToJs :: Bind Ann -> m [Haxe]
   bindToJs (NonRec ann ident val) = return <$> nonRecToHaxe ann ident val
   bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToHaxe)
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a single non-recursive
+  -- Generate code in the simplified Haxe intermediate representation for a single non-recursive
   -- declaration.
   --
   -- The main purpose of this function is to handle code generation for comments.
@@ -162,15 +160,15 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   withPos Nothing js = return js
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a variable based on a
+  -- Generate code in the simplified Haxe intermediate representation for a variable based on a
   -- PureScript identifier.
   --
   var :: Ident -> Haxe
   var = HaxeVar Nothing . identToJs
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for an accessor based on
-  -- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
+  -- Generate code in the simplified Haxe intermediate representation for an accessor based on
+  -- a PureScript identifier. If the name is not valid in Haxe (symbol based, reserved name) an
   -- indexer is returned.
   --
   accessor :: Ident -> Haxe -> Haxe
@@ -182,7 +180,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
                       | otherwise = HaxeAccessor Nothing prop
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a value or expression.
+  -- Generate code in the simplified Haxe intermediate representation for a value or expression.
   --
   valueToJs :: Expr Ann -> m Haxe
   valueToJs e =
@@ -298,7 +296,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     return $ HaxeApp Nothing (HaxeFunction Nothing Nothing [] block) []
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- Generate code in the simplified Haxe intermediate representation for a reference to a
   -- variable.
   --
   varToJs :: Qualified Ident -> Haxe
@@ -306,19 +304,19 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   varToJs qual = qualifiedToHaxe id qual
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- Generate code in the simplified Haxe intermediate representation for a reference to a
   -- variable that may have a qualified name.
   --
   qualifiedToHaxe :: (a -> Ident) -> Qualified a -> Haxe
   qualifiedToHaxe f (Qualified (Just (ModuleName [ProperName mn'])) a) | mn' == C.prim = HaxeVar Nothing . runIdent $ f a
-  qualifiedToHaxe f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (HaxeVar Nothing (moduleNameToJs mn'))
+  qualifiedToHaxe f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (HaxeVar Nothing (moduleNameToHaxe mn'))
   qualifiedToHaxe f (Qualified _ a) = HaxeVar Nothing $ identToJs (f a)
 
   foreignIdent :: Ident -> Haxe
   foreignIdent ident = accessorString (runIdent ident) (HaxeVar Nothing "$foreign")
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for pattern match binders
+  -- Generate code in the simplified Haxe intermediate representation for pattern match binders
   -- and guards.
   --
   bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [Haxe] -> m Haxe
@@ -363,7 +361,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     traverse (withPos ss) =<< binderToJs' s done binder
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a pattern match
+  -- Generate code in the simplified Haxe intermediate representation for a pattern match
   -- binder.
   --
   binderToJs' :: String -> [Haxe] -> Binder Ann -> m [Haxe]
@@ -428,7 +426,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
       js <- binderToJs elVar done'' binder
       return (HaxeVariableIntroduction Nothing elVar (Just (HaxeIndexer Nothing (HaxeNumericLiteral Nothing (Left index)) (HaxeVar Nothing varName))) : js)
 
-  -- Check that all integers fall within the valid int range for JavaScript.
+  -- Check that all integers fall within the valid int range for Haxe.
   checkIntegers :: Haxe -> m ()
   checkIntegers = void . everywhereOnHaxeTopDownM go
     where

@@ -166,13 +166,6 @@ library
                      Language.PureScript.CodeGen.Haxe
                      Language.PureScript.CodeGen.Haxe.AST
                      Language.PureScript.CodeGen.Haxe.Common
-                     Language.PureScript.CodeGen.Haxe.Optimizer
-                     Language.PureScript.CodeGen.Haxe.Optimizer.Blocks
-                     Language.PureScript.CodeGen.Haxe.Optimizer.Common
-                     Language.PureScript.CodeGen.Haxe.Optimizer.Inliner
-                     Language.PureScript.CodeGen.Haxe.Optimizer.MagicDo
-                     Language.PureScript.CodeGen.Haxe.Optimizer.TCO
-                     Language.PureScript.CodeGen.Haxe.Optimizer.Unused
                      Language.PureScript.Constants
                      Language.PureScript.CoreFn
                      Language.PureScript.CoreFn.Ann

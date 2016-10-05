@@ -355,10 +355,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             return $ Just $ H.HaxeApp Nothing (H.HaxeVar Nothing "require") [H.HaxeStringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
-    rawJs <- H.moduleToHaxe m foreignInclude
+    rawHaxe <- H.moduleToHaxe m foreignInclude
     dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
     sourceMaps <- lift $ asks optionsSourceMaps
-    let (pjs, mappings) = if sourceMaps then prettyPrintHaxeWithSourceMaps rawJs else (prettyPrintHaxe rawJs, [])
+    let (pjs, mappings) = if sourceMaps then prettyPrintHaxeWithSourceMaps rawHaxe else (prettyPrintHaxe rawHaxe, [])
     let filePath = runModuleName mn
         jsFile = outputDir </> filePath </> "index.js"
         mapFile = outputDir </> filePath </> "index.js.map"
