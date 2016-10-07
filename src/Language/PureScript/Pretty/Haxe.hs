@@ -138,6 +138,13 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
+  match (HaxeMethod _ name args ret) = mconcat <$> sequence
+    [ return $ emit ("public static function " ++ name ++ "(" ++ intercalate ", " args ++ ") {\n")
+    , withIndent $ prettyStatements [ret]
+    , return $ emit "\n"
+    , currentIndent
+    , return $ emit "}"
+    ]
   match _ = mzero
 
 string :: (Emit gen) => String -> gen

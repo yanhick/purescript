@@ -52,15 +52,13 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     let mnLookup = renameImports usedNames imps
     haxeImports <- T.traverse (importToHaxe mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
     let decls' = renameModules mnLookup decls
-    haxeDecls <- mapM bindToHaxe decls'
+    haxeDecls <- mapM bindToHaxeMethod decls'
     F.traverse_ (F.traverse_ checkIntegers) haxeDecls
     comments <- not <$> asks optionsNoComments
     let package = HaxePackage Nothing (moduleNameToHaxe mn)
-    let strict = HaxeStringLiteral Nothing "use strict"
-    let header = if comments && not (null coms) then HaxeComment Nothing coms strict else strict
     let foreign' = [HaxeVariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let hxClass = HaxeClass Nothing (moduleNameToHaxe mn) (foreign' ++ (concat haxeDecls))
-    let moduleBody = header : package : haxeImports ++ [hxClass]
+    let moduleBody = package : haxeImports ++ [hxClass]
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
@@ -135,6 +133,12 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   bindToHaxe :: Bind Ann -> m [Haxe]
   bindToHaxe (NonRec ann ident val) = return <$> nonRecToHaxe ann ident val
   bindToHaxe (Rec vals) = forM vals (uncurry . uncurry $ nonRecToHaxe)
+
+  bindToHaxeMethod :: Bind Ann -> m [Haxe]
+  bindToHaxeMethod (NonRec (ss, _, _, _) ident val) = return <$> do
+    js <- valueToJs val
+    withPos ss $ HaxeMethod Nothing (identToJs ident) [] (HaxeReturn Nothing js)
+  bindToHaxeMethod b = bindToHaxe b
 
   -- |
   -- Generate code in the simplified Haxe intermediate representation for a single non-recursive
