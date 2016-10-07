@@ -55,9 +55,9 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     haxeDecls <- mapM bindToHaxeMethod decls'
     F.traverse_ (F.traverse_ checkIntegers) haxeDecls
     comments <- not <$> asks optionsNoComments
-    let package = HaxePackage Nothing (moduleNameToHaxe mn)
+    let package = HaxePackage Nothing (moduleNameToHaxePackage mn)
     let foreign' = [HaxeVariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
-    let hxClass = HaxeClass Nothing (moduleNameToHaxe mn) (foreign' ++ (concat haxeDecls))
+    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (foreign' ++ (concat haxeDecls))
     let moduleBody = package : haxeImports ++ [hxClass]
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps

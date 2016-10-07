@@ -13,7 +13,19 @@ import Language.PureScript.Names
 
 moduleNameToHaxe :: ModuleName -> String
 moduleNameToHaxe (ModuleName pns) =
-  let name = intercalate "." (runProperName `map` pns)
+  let name =  runProperName `map` pns
+      name' = intercalate "." ((((<$>) toLower) <$> (init name)) ++ [(last name)])
+  in if nameIsJsBuiltIn name' then "$$" ++ name' else name'
+
+moduleNameToHaxePackage :: ModuleName -> String
+moduleNameToHaxePackage (ModuleName pns) =
+  let name =  runProperName `map` pns
+      name' = intercalate "." (((<$>) toLower) <$> (init name))
+  in if nameIsJsBuiltIn name' then "$$" ++ name' else name'
+
+moduleNameToHaxeClass :: ModuleName -> String
+moduleNameToHaxeClass (ModuleName pns) =
+  let name =  last $ runProperName `map` pns
   in if nameIsJsBuiltIn name then "$$" ++ name else name
 
 -- |
