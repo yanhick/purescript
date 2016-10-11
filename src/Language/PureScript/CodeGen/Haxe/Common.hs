@@ -15,18 +15,18 @@ moduleNameToHaxe :: ModuleName -> String
 moduleNameToHaxe (ModuleName pns) =
   let name =  runProperName `map` pns
       name' = intercalate "." ((((<$>) toLower) <$> (init name)) ++ [(last name)])
-  in if nameIsJsBuiltIn name' then "$$" ++ name' else name'
+  in if nameIsHaxeBuiltIn name' then "__" ++ name' else name'
 
 moduleNameToHaxePackage :: ModuleName -> String
 moduleNameToHaxePackage (ModuleName pns) =
   let name =  runProperName `map` pns
       name' = intercalate "." (((<$>) toLower) <$> (init name))
-  in if nameIsJsBuiltIn name' then "$$" ++ name' else name'
+  in if nameIsHaxeBuiltIn name' then "__" ++ name' else name'
 
 moduleNameToHaxeClass :: ModuleName -> String
 moduleNameToHaxeClass (ModuleName pns) =
   let name =  last $ runProperName `map` pns
-  in if nameIsJsBuiltIn name then "$$" ++ name else name
+  in if nameIsHaxeBuiltIn name then "__" ++ name else name
 
 moduleNameToFilePath :: ModuleName -> String
 moduleNameToFilePath (ModuleName pns) =
@@ -44,7 +44,7 @@ moduleNameToFilePath (ModuleName pns) =
 --
 identToJs :: Ident -> String
 identToJs (Ident name)
-  | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" ++ name
+  | nameIsHaxeReserved name || nameIsHaxeBuiltIn name = "__" ++ name
   | otherwise = concatMap identCharToString name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 
@@ -61,41 +61,41 @@ identNeedsEscaping s = s /= identToJs (Ident s) || null s
 identCharToString :: Char -> String
 identCharToString c | isAlphaNum c = [c]
 identCharToString '_' = "_"
-identCharToString '.' = "$dot"
-identCharToString '$' = "$dollar"
-identCharToString '~' = "$tilde"
-identCharToString '=' = "$eq"
-identCharToString '<' = "$less"
-identCharToString '>' = "$greater"
-identCharToString '!' = "$bang"
-identCharToString '#' = "$hash"
-identCharToString '%' = "$percent"
-identCharToString '^' = "$up"
-identCharToString '&' = "$amp"
-identCharToString '|' = "$bar"
-identCharToString '*' = "$times"
-identCharToString '/' = "$div"
-identCharToString '+' = "$plus"
-identCharToString '-' = "$minus"
-identCharToString ':' = "$colon"
-identCharToString '\\' = "$bslash"
-identCharToString '?' = "$qmark"
-identCharToString '@' = "$at"
-identCharToString '\'' = "$prime"
+identCharToString '.' = "__dot__"
+identCharToString '$' = "__dollar__"
+identCharToString '~' = "__tilde__"
+identCharToString '=' = "__eq__"
+identCharToString '<' = "__less__"
+identCharToString '>' = "__greater__"
+identCharToString '!' = "__bang__"
+identCharToString '#' = "__hash__"
+identCharToString '%' = "__percent__"
+identCharToString '^' = "__up__"
+identCharToString '&' = "__amp__"
+identCharToString '|' = "__bar__"
+identCharToString '*' = "__times__"
+identCharToString '/' = "__div__"
+identCharToString '+' = "__plus__"
+identCharToString '-' = "__minus__"
+identCharToString ':' = "__colon__"
+identCharToString '\\' = "__bslash__"
+identCharToString '?' = "__qmark__"
+identCharToString '@' = "__at__"
+identCharToString '\'' = "__prime__"
 identCharToString c = '$' : show (ord c)
 
 -- |
--- Checks whether an identifier name is reserved in Javascript.
+-- Checks whether an identifier name is reserved in Haxe.
 --
-nameIsJsReserved :: String -> Bool
-nameIsJsReserved name =
+nameIsHaxeReserved :: String -> Bool
+nameIsHaxeReserved name =
   name `elem` jsAnyReserved
 
 -- |
--- Checks whether a name matches a built-in value in Javascript.
+-- Checks whether a name matches a built-in value in Haxe.
 --
-nameIsJsBuiltIn :: String -> Bool
-nameIsJsBuiltIn name =
+nameIsHaxeBuiltIn :: String -> Bool
+nameIsHaxeBuiltIn name =
   name `elem`
     [ "arguments"
     , "Array"
@@ -113,7 +113,6 @@ nameIsJsBuiltIn name =
     , "EvalError"
     , "Float32Array"
     , "Float64Array"
-    , "Function"
     , "Infinity"
     , "Int16Array"
     , "Int32Array"
