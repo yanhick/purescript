@@ -305,7 +305,7 @@ inferForeignModules = fmap (M.mapMaybe id) . traverse inferForeignModule
     inferForeignModule :: Either RebuildPolicy FilePath -> m (Maybe FilePath)
     inferForeignModule (Left _) = return Nothing
     inferForeignModule (Right path) = do
-      let jsFile = replaceExtension path "js"
+      let jsFile = replaceExtension path "hx"
       exists <- liftIO $ doesFileExist jsFile
       if exists
         then return (Just jsFile)
@@ -351,7 +351,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             tell $ errorMessage $ UnnecessaryFFIModule mn path
             return Nothing
         | otherwise -> do
-            checkForeignDecls m path
             return $ Just $ H.HaxeApp Nothing (H.HaxeVar Nothing "require") [H.HaxeStringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
