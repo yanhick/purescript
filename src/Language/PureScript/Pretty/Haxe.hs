@@ -58,7 +58,7 @@ literals = mkPattern' match'
                              | otherwise = emit s
   match (HaxeBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
-    , withIndent $ prettyStatements sts
+    , withIndent $ prettyStatementsSC sts
     , return $ emit "\n"
     , currentIndent
     , return $ emit "}"
@@ -129,8 +129,8 @@ literals = mkPattern' match'
 
     removeComments [] = []
   match (HaxeRaw _ js) = return $ emit js
-  match (HaxeImport _ i) = return $ emit ("import " <> i)
-  match (HaxePackage _ p) = return $ emit ("package " <> p)
+  match (HaxeImport _ i) = return $ emit ("import " <> i <> ";")
+  match (HaxePackage _ p) = return $ emit ("package " <> p <> ";")
   match (HaxeClass _ n sts) = mconcat <$> sequence
     [ return $ emit ("class " ++ n ++ " {\n")
     , withIndent $ prettyStatements sts
@@ -140,7 +140,7 @@ literals = mkPattern' match'
     ]
   match (HaxeMethod _ name args ret) = mconcat <$> sequence
     [ return $ emit ("public static function " ++ name ++ "(" ++ intercalate ", " args ++ ") {\n")
-    , withIndent $ prettyStatements [ret]
+    , withIndent $ prettyStatementsSC [ret]
     , return $ emit "\n"
     , currentIndent
     , return $ emit "}"
@@ -243,10 +243,16 @@ binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " ++ str ++ " ") <> v2)
     match' _ = Nothing
 
 prettyStatements :: (Emit gen) => [Haxe] -> StateT PrinterState Maybe gen
-prettyStatements sts = do
+prettyStatements = prettyStatements' ""
+
+prettyStatementsSC :: (Emit gen) => [Haxe] -> StateT PrinterState Maybe gen
+prettyStatementsSC = prettyStatements' ";"
+
+prettyStatements' :: (Emit gen) => String -> [Haxe] -> StateT PrinterState Maybe gen
+prettyStatements' lineEnd sts = do
   jss <- forM sts prettyPrintHaxe'
   indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
+  return $ intercalate (emit "\n") $ map ((<> emit lineEnd) . (indentString <>)) jss
 
 -- |
 -- Generate a pretty-printed string representing a Javascript expression
