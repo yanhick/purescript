@@ -62,7 +62,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
-                               ++ map (runIdent &&& foreignIdent) foreignExps
+                               ++ map (runIdent &&& foreignIdent mn) foreignExps
     return moduleBody
 
   where
@@ -234,7 +234,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     unApp other args = (other, args)
   valueToJs' (Var (_, _, _, Just IsForeign) qi@(Qualified (Just mn') ident)) =
     return $ if mn' == mn
-             then foreignIdent ident
+             then foreignIdent mn ident
              else varToJs qi
   valueToJs' (Var (_, _, _, Just IsForeign) ident) =
     error $ "Encountered an unqualified reference to a foreign ident " ++ showQualified showIdent ident
@@ -317,8 +317,8 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   qualifiedToHaxe f (Qualified (Just mn') a) | mn /= mn' = accessor (f a) (HaxeVar Nothing (moduleNameToHaxe mn'))
   qualifiedToHaxe f (Qualified _ a) = HaxeVar Nothing $ identToJs (f a)
 
-  foreignIdent :: Ident -> Haxe
-  foreignIdent ident = accessorString (runIdent ident) (HaxeVar Nothing "$foreign")
+  foreignIdent :: ModuleName -> Ident -> Haxe
+  foreignIdent mn ident = accessorString (runIdent ident) (HaxeVar Nothing (moduleNameToHaxe mn ++ "Foreign"))
 
   -- |
   -- Generate code in the simplified Haxe intermediate representation for pattern match binders
