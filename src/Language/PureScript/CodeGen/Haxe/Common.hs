@@ -28,6 +28,11 @@ moduleNameToHaxeClass (ModuleName pns) =
   let name =  last $ runProperName `map` pns
   in if nameIsJsBuiltIn name then "$$" ++ name else name
 
+moduleNameToFilePath :: ModuleName -> String
+moduleNameToFilePath (ModuleName pns) =
+  let name =  runProperName `map` pns
+  in intercalate "/" (((<$>) toLower) <$> (init name))
+
 -- |
 -- Convert an Ident into a valid Javascript identifier:
 --
