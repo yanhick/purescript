@@ -137,7 +137,9 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   bindToHaxeMethod :: Bind Ann -> m [Haxe]
   bindToHaxeMethod (NonRec (ss, _, _, _) ident val) = return <$> do
     js <- valueToJs val
-    withPos ss $ HaxeMethod Nothing (identToJs ident) [] (HaxeReturn Nothing js)
+    withPos ss $ case js of
+      HaxeFunction ss' name args j -> HaxeMethod ss' (identToJs ident) args (HaxeReturn Nothing j)
+      _ -> HaxeMethod Nothing (identToJs ident) [] (HaxeReturn Nothing js)
   bindToHaxeMethod b = bindToHaxe b
 
   -- |
