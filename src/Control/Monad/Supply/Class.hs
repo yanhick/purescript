@@ -25,4 +25,4 @@ instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m) where
   fresh = lift fresh
 
 freshName :: MonadSupply m => m String
-freshName = fmap (('$' :) . show) fresh
+freshName = fmap (('_' :) . show) fresh
