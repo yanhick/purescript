@@ -228,7 +228,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (qualifiedToHaxe id name) args'
       Var (_, _, _, Just IsTypeClassConstructor) name ->
-        return $ HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (qualifiedToHaxe id name) args'
+        return $ HaxeApp Nothing (qualifiedToHaxe id name) args'
       _ -> flip (foldl (\fn a -> HaxeApp Nothing fn [a])) args' <$> valueToJs f
     where
     unApp :: Expr Ann -> [Expr Ann] -> (Expr Ann, [Expr Ann])
