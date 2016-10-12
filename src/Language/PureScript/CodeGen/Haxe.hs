@@ -209,14 +209,13 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     extendObj obj sts
   valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
     let args = unAbs e
-    in return $ HaxeFunction Nothing Nothing (map identToJs args) (HaxeBlock Nothing $ map assign args)
+    in return $ HaxeFunction Nothing Nothing (map identToJs args) (HaxeObjectLiteral Nothing $ map assign args)
     where
     unAbs :: Expr Ann -> [Ident]
     unAbs (Abs _ arg val) = arg : unAbs val
     unAbs _ = []
-    assign :: Ident -> Haxe
-    assign name = HaxeAssignment Nothing (accessorString (runIdent name) (HaxeVar Nothing "this"))
-                               (var name)
+    assign :: Ident -> (String, Haxe)
+    assign name = (runIdent name, var name)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
     return $ HaxeFunction Nothing Nothing [identToJs arg] (HaxeBlock Nothing [HaxeReturn Nothing ret])
