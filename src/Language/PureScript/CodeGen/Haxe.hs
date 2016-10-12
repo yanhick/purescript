@@ -343,10 +343,10 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
       go _ _ _ = internalError "Invalid arguments to bindersToJs"
 
       failedPatternError :: [String] -> Haxe
-      failedPatternError names = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing "Error") [HaxeBinary Nothing Add (HaxeStringLiteral Nothing failedPatternMessage) (HaxeArrayLiteral Nothing $ zipWith valueError names vals)]
+      failedPatternError names = HaxeStringLiteral Nothing failedPatternMessage
 
       failedPatternMessage :: String
-      failedPatternMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan ++ ": "
+      failedPatternMessage = "Failed pattern match" ++ maybe "" (((" at " ++ runModuleName mn ++ " ") ++) . displayStartEndPos) maybeSpan
 
       valueError :: String -> Haxe -> Haxe
       valueError _ l@(HaxeNumericLiteral _ _) = l
