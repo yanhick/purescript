@@ -13,25 +13,26 @@ import Language.PureScript.Names
 
 moduleNameToHaxe :: ModuleName -> String
 moduleNameToHaxe (ModuleName pns) =
-  let name =  runProperName `map` pns
-      name' = intercalate "." ((((<$>) toLower) <$> (init name)) ++ [(last name)])
-  in if nameIsHaxeBuiltIn name' then "__" ++ name' else name'
+  let name =  runProperName <$> pns
+  in intercalate "." $ replaceBuiltinName <$> ((((<$>) toLower) <$> (init name)) ++ [(last name)])
 
 moduleNameToHaxePackage :: ModuleName -> String
 moduleNameToHaxePackage (ModuleName pns) =
-  let name =  runProperName `map` pns
-      name' = intercalate "." (((<$>) toLower) <$> (init name))
-  in if nameIsHaxeBuiltIn name' then "__" ++ name' else name'
+  let name =  runProperName <$> pns
+  in intercalate "." $ replaceBuiltinName <$> (((<$>) toLower) <$> (init name))
 
 moduleNameToHaxeClass :: ModuleName -> String
 moduleNameToHaxeClass (ModuleName pns) =
-  let name =  last $ runProperName `map` pns
-  in if nameIsHaxeBuiltIn name then "__" ++ name else name
+  let name =  last $ runProperName <$> pns
+  in replaceBuiltinName name
 
 moduleNameToFilePath :: ModuleName -> String
 moduleNameToFilePath (ModuleName pns) =
-  let name =  runProperName `map` pns
-  in intercalate "/" (((<$>) toLower) <$> (init name))
+  let name =  runProperName <$> pns
+  in intercalate "/" $ replaceBuiltinName <$> (((<$>) toLower) <$> (init name))
+
+replaceBuiltinName :: String -> String
+replaceBuiltinName name = identToJs $ Ident name
 
 -- |
 -- Convert an Ident into a valid Javascript identifier:
@@ -44,7 +45,7 @@ moduleNameToFilePath (ModuleName pns) =
 --
 identToJs :: Ident -> String
 identToJs (Ident name)
-  | nameIsHaxeReserved name || nameIsHaxeBuiltIn name = "__" ++ name
+  | nameIsHaxeReserved name || nameIsHaxeBuiltIn name = name ++ "__"
   | otherwise = concatMap identCharToString name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 
