@@ -42,7 +42,7 @@ import Control.Monad.Writer.Strict
 import Control.Monad.Trans.Except
 
 import System.Exit
-import System.Process hiding (cwd)
+import System.Process
 import System.FilePath
 import System.Directory
 import System.IO.UTF8
@@ -234,10 +234,10 @@ assertCompiles supportExterns inputFiles =
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
-        process <- findNodeProcess
+        process <- findHaxeProcess
         let entryPoint = modulesDir </> "index.js"
         writeFile entryPoint "require('Main').main()"
-        result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+        result <- traverse (\haxe -> readCreateProcessWithExitCode ((proc haxe ["Main"]) { cwd = Just modulesDir } ) "") process
         case result of
           Just (ExitSuccess, out, err)
             | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err

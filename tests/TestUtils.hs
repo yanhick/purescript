@@ -20,6 +20,11 @@ findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
   where
   names = ["nodejs", "node"]
 
+findHaxeProcess :: IO (Maybe String)
+findHaxeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
+  where
+  names = ["haxe"]
+
 -- |
 -- Fetches code necessary to run the tests with. The resulting support code
 -- should then be checked in, so that npm/bower etc is not required to run the
