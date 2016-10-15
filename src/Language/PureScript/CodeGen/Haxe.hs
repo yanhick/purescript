@@ -141,7 +141,9 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     bindToHaxeMethod' :: Haxe -> Haxe
     bindToHaxeMethod' b@(HaxeVariableIntroduction _ name hx) =
       case hx of
-        Just hx' -> HaxeMethod Nothing name [] (HaxeReturn Nothing hx')
+        Just hx' -> case hx' of
+          (HaxeFunction _ _ args body) ->  HaxeMethod Nothing name args (HaxeReturn Nothing body)
+          _ ->  HaxeMethod Nothing name [] (HaxeReturn Nothing hx')
         Nothing -> b
     bindToHaxeMethod' b = b
 
