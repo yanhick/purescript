@@ -307,8 +307,8 @@ prettyPrintHaxe' = A.runKleisli $ runPattern matchValue
                     , binary    GreaterThan          ">"
                     , binary    GreaterThanOrEqualTo ">="
                     , AssocR instanceOf $ \v1 v2 -> v1 <> emit " instanceof " <> v2 ]
-                  , [ binary    EqualTo              "==="
-                    , binary    NotEqualTo           "!==" ]
+                  , [ binary    EqualTo              "=="
+                    , binary    NotEqualTo           "!=" ]
                   , [ binary    BitwiseAnd           "&" ]
                   , [ binary    BitwiseXor           "^" ]
                   , [ binary    BitwiseOr            "|" ]
