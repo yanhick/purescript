@@ -73,6 +73,13 @@ literals = mkPattern' match'
     , return $ emit " = "
     , prettyPrintHaxe' value
     ]
+  match (HaxeAttribute _ target value) = mconcat <$> sequence
+    [ return $ emit "public static "
+    , prettyPrintHaxe' target
+    , return $ emit " = "
+    , prettyPrintHaxe' value
+    , return $ emit ";"
+    ]
   match (HaxeWhile _ cond sts) = mconcat <$> sequence
     [ return $ emit "while ("
     , prettyPrintHaxe' cond

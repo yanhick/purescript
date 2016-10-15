@@ -204,6 +204,10 @@ data Haxe
   --
   | HaxeAssignment (Maybe SourceSpan) Haxe Haxe
   -- |
+  -- An attribute introduction (name, value). Value must be a constant
+  --
+  | HaxeAttribute (Maybe SourceSpan) Haxe Haxe
+  -- |
   -- While loop
   --
   | HaxeWhile (Maybe SourceSpan) Haxe Haxe
@@ -272,6 +276,7 @@ withSourceSpan withSpan = go
   go (HaxeBlock _ js) = HaxeBlock ss js
   go (HaxeVariableIntroduction _ name j) = HaxeVariableIntroduction ss name j
   go (HaxeAssignment _ j1 j2) = HaxeAssignment ss j1 j2
+  go (HaxeAttribute _ j1 j2) = HaxeAttribute ss j1 j2
   go (HaxeWhile _ j1 j2) = HaxeWhile ss j1 j2
   go (HaxeForIn _ name j1 j2) = HaxeForIn ss name j1 j2
   go (HaxeIfElse _ j1 j2 j3) = HaxeIfElse ss j1 j2 j3
@@ -308,6 +313,7 @@ getSourceSpan = go
   go (HaxeBlock ss _) = ss
   go (HaxeVariableIntroduction ss _ _) = ss
   go (HaxeAssignment ss _ _) = ss
+  go (HaxeAttribute ss _ _) = ss
   go (HaxeWhile ss _ _) = ss
   go (HaxeForIn ss _ _ _) = ss
   go (HaxeIfElse ss _ _ _) = ss
@@ -343,6 +349,7 @@ everywhereOnHaxe f = go
   go (HaxeBlock ss js) = f (HaxeBlock ss (map go js))
   go (HaxeVariableIntroduction ss name j) = f (HaxeVariableIntroduction ss name (fmap go j))
   go (HaxeAssignment ss j1 j2) = f (HaxeAssignment ss (go j1) (go j2))
+  go (HaxeAttribute ss j1 j2) = f (HaxeAttribute ss (go j1) (go j2))
   go (HaxeWhile ss j1 j2) = f (HaxeWhile ss (go j1) (go j2))
   go (HaxeForIn ss name j1 j2) = f (HaxeForIn ss name (go j1) (go j2))
   go (HaxeIfElse ss j1 j2 j3) = f (HaxeIfElse ss (go j1) (go j2) (fmap go j3))
@@ -372,6 +379,7 @@ everywhereOnHaxeTopDownM f = f >=> go
   go (HaxeBlock ss js) = HaxeBlock ss <$> traverse f' js
   go (HaxeVariableIntroduction ss name j) = HaxeVariableIntroduction ss name <$> traverse f' j
   go (HaxeAssignment ss j1 j2) = HaxeAssignment ss <$> f' j1 <*> f' j2
+  go (HaxeAttribute ss j1 j2) = HaxeAttribute ss <$> f' j1 <*> f' j2
   go (HaxeWhile ss j1 j2) = HaxeWhile ss <$> f' j1 <*> f' j2
   go (HaxeForIn ss name j1 j2) = HaxeForIn ss name <$> f' j1 <*> f' j2
   go (HaxeIfElse ss j1 j2 j3) = HaxeIfElse ss <$> f' j1 <*> f' j2 <*> traverse f' j3
@@ -398,6 +406,7 @@ everythingOnHaxe (<>) f = go
   go j@(HaxeBlock _ js) = foldl (<>) (f j) (map go js)
   go j@(HaxeVariableIntroduction _ _ (Just j1)) = f j <> go j1
   go j@(HaxeAssignment _ j1 j2) = f j <> go j1 <> go j2
+  go j@(HaxeAttribute _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeWhile _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeForIn _ _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeIfElse _ j1 j2 Nothing) = f j <> go j1 <> go j2
