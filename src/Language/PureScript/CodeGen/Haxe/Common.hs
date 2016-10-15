@@ -101,7 +101,6 @@ nameIsHaxeBuiltIn name =
     [ "arguments"
     , "Array"
     , "ArrayBuffer"
-    , "Boolean"
     , "DataView"
     , "Date"
     , "decodeURI"
