@@ -52,12 +52,13 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     let mnLookup = renameImports usedNames imps
     haxeImports <- T.traverse (importToHaxe mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
     let decls' = renameModules mnLookup decls
-    haxeDecls <- mapM bindToHaxeMethod decls'
-    F.traverse_ (F.traverse_ checkIntegers) haxeDecls
+    haxeDecls <- mapM bindToHaxe decls'
+    let haxeDecls' = bindToHaxeMethod <$> haxeDecls
+    F.traverse_ (F.traverse_ checkIntegers) haxeDecls'
     comments <- not <$> asks optionsNoComments
     let package = HaxePackage Nothing (moduleNameToHaxePackage mn)
     let foreign' = [HaxeImport Nothing (moduleNameToHaxe mn ++ "Foreign") | not $ null foreigns || isNothing foreign_]
-    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (concat haxeDecls)
+    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (concat haxeDecls')
     let moduleBody = package : haxeImports ++ foreign' ++ [hxClass]
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
@@ -134,13 +135,15 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   bindToHaxe (NonRec ann ident val) = return <$> nonRecToHaxe ann ident val
   bindToHaxe (Rec vals) = forM vals (uncurry . uncurry $ nonRecToHaxe)
 
-  bindToHaxeMethod :: Bind Ann -> m [Haxe]
-  bindToHaxeMethod (NonRec (ss, _, _, _) ident val) = return <$> do
-    js <- valueToJs val
-    withPos ss $ case js of
-      HaxeFunction ss' name args j -> HaxeMethod ss' (identToJs ident) args (HaxeReturn Nothing j)
-      _ -> HaxeMethod Nothing (identToJs ident) [] (HaxeReturn Nothing js)
-  bindToHaxeMethod b = bindToHaxe b
+  bindToHaxeMethod :: [Haxe] -> [Haxe]
+  bindToHaxeMethod hx = bindToHaxeMethod' <$> hx
+    where
+    bindToHaxeMethod' :: Haxe -> Haxe
+    bindToHaxeMethod' b@(HaxeVariableIntroduction _ name hx) =
+      case hx of
+        Just hx' -> HaxeMethod Nothing name [] (HaxeReturn Nothing hx')
+        Nothing -> b
+    bindToHaxeMethod' b = b
 
   -- |
   -- Generate code in the simplified Haxe intermediate representation for a single non-recursive
