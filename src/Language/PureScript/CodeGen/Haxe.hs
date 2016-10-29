@@ -59,7 +59,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     let package = HaxePackage Nothing (moduleNameToHaxePackage mn)
     let foreign' = [HaxeImport Nothing (moduleNameToHaxe mn ++ "Foreign") | not $ null foreigns || isNothing foreign_]
     let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (concat haxeDecls')
-    let moduleBody = package : haxeImports ++ foreign' ++ [hxClass]
+    let moduleBody = package : haxeImports ++ foreign' ++ concat haxeDecls'
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
@@ -166,6 +166,9 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     if withoutComment
        then nonRecToHaxe a i (modifyAnn removeComments e)
        else HaxeComment Nothing com <$> nonRecToHaxe a i (modifyAnn removeComments e)
+  nonRecToHaxe (ss, _, _, _) ident val@(Constructor _ _ _ _) = do
+    js <- valueToJs val
+    withPos ss $ HaxeClass Nothing (identToJs ident) [js]
   nonRecToHaxe (ss, _, _, _) ident val = do
     js <- valueToJs val
     withPos ss $ HaxeVariableIntroduction Nothing (identToJs ident) (Just js)
@@ -271,7 +274,8 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
           let body = [ HaxeAssignment Nothing (HaxeAccessor Nothing (identToJs f) (HaxeVar Nothing "this")) (var f) | f <- fields ]
-          in HaxeFunction Nothing (Just ctor) (identToJs `map` fields) (HaxeBlock Nothing body)
+              members = [ HaxeMember Nothing (identToJs f) (HaxeBlock Nothing [])| f <- fields ]
+          in HaxeClass Nothing ctor $ members ++ [HaxeMethod Nothing "new" (identToJs `map` fields) (HaxeBlock Nothing body)]
         createFn =
           let body = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) (var `map` fields)
           in foldr (\f inner -> HaxeFunction Nothing Nothing [identToJs f] (HaxeBlock Nothing [HaxeReturn Nothing inner])) body fields

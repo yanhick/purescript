@@ -168,6 +168,10 @@ data Haxe
   --
   | HaxeMethod (Maybe SourceSpan) String [String] Haxe
   -- |
+  -- A class member introduction (name, body)
+  --
+  | HaxeMember (Maybe SourceSpan) String Haxe
+  -- |
   -- Function application
   --
   | HaxeApp (Maybe SourceSpan) Haxe [Haxe]
@@ -196,7 +200,7 @@ data Haxe
   --
   | HaxePackage (Maybe SourceSpan) String
   -- |
-  -- A class declaration and optional content
+  -- A class declaration (name, methods)
   --
   | HaxeClass (Maybe SourceSpan) String [Haxe]
   -- |
@@ -270,6 +274,7 @@ withSourceSpan withSpan = go
   go (HaxeAccessor _ prop j) = HaxeAccessor ss prop j
   go (HaxeFunction _ name args j) = HaxeFunction ss name args j
   go (HaxeMethod _ name args j) = HaxeMethod ss name args j
+  go (HaxeMember _ name j) = HaxeMember ss name j
   go (HaxeApp _ j js) = HaxeApp ss j js
   go (HaxeVar _ s) = HaxeVar ss s
   go (HaxeConditional _ j1 j2 j3) = HaxeConditional ss j1 j2 j3
@@ -307,6 +312,7 @@ getSourceSpan = go
   go (HaxeAccessor ss _ _) = ss
   go (HaxeFunction ss _ _ _) = ss
   go (HaxeMethod ss _ _ _) = ss
+  go (HaxeMember ss _ _) = ss
   go (HaxeApp ss _ _) = ss
   go (HaxeVar ss _) = ss
   go (HaxeConditional ss _ _ _) = ss
@@ -389,6 +395,7 @@ everywhereOnHaxeTopDownM f = f >=> go
   go (HaxeInstanceOf ss j1 j2) = HaxeInstanceOf ss <$> f' j1 <*> f' j2
   go (HaxeComment ss com j) = HaxeComment ss com <$> f' j
   go (HaxeMethod ss name args j) = HaxeMethod ss name args <$> f' j
+  go (HaxeMember ss name j) = HaxeMember ss name <$> f' j
   go other = f other
 
 everythingOnHaxe :: (r -> r -> r) -> (Haxe -> r) -> Haxe -> r
@@ -417,4 +424,5 @@ everythingOnHaxe (<>) f = go
   go j@(HaxeInstanceOf _ j1 j2) = f j <> go j1 <> go j2
   go j@(HaxeComment _ _ j1) = f j <> go j1
   go j@(HaxeMethod _ _ _ j1) = f j <> go j1
+  go j@(HaxeMember _ _ j1) = f j <> go j1
   go other = f other

@@ -152,6 +152,7 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
+  match (HaxeMember _ name ret) = return $ emit ("public var " ++ name ++ ";" )
   match _ = mzero
 
 string :: (Emit gen) => String -> gen
