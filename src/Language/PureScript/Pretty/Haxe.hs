@@ -152,6 +152,13 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
+  match (HaxeConstructor _ args ret) = mconcat <$> sequence
+    [ return $ emit ("public function new (" ++ intercalate ", " args ++ ") {\n")
+    , withIndent $ prettyStatementsSC [ret]
+    , return $ emit "\n"
+    , currentIndent
+    , return $ emit "}"
+    ]
   match (HaxeMember _ name ret) = return $ emit ("public var " ++ name ++ ";" )
   match _ = mzero
 
