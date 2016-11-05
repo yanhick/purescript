@@ -160,6 +160,11 @@ literals = mkPattern' match'
     , return $ emit "}"
     ]
   match (HaxeMember _ name ret) = return $ emit ("public var " ++ name ++ ";" )
+  match (HaxeStaticMember _ name ret) = mconcat <$> sequence
+    [ return $ emit $ "public static var " ++ name
+    , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintHaxe') ret
+    , return $ emit ";"
+    ]
   match _ = mzero
 
 string :: (Emit gen) => String -> gen

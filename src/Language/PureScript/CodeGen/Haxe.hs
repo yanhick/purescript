@@ -268,9 +268,9 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
                   HaxeFunction Nothing Nothing ["value"]
                     (HaxeBlock Nothing [HaxeReturn Nothing $ HaxeVar Nothing "value"]))])
   valueToJs' (Constructor _ _ (ProperName ctor) []) =
-    return $ iife ctor [ HaxeFunction Nothing (Just ctor) [] (HaxeBlock Nothing [])
-           , HaxeAssignment Nothing (HaxeAccessor Nothing "value" (HaxeVar Nothing ctor))
-                (HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) []) ]
+    let members = [HaxeStaticMember Nothing "value" (Just body) ]
+        body = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) []
+    in return $ HaxeClass Nothing ctor $ members ++ [HaxeConstructor Nothing [] (HaxeBlock Nothing [])]
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
           let body = [ HaxeAssignment Nothing (HaxeAccessor Nothing (identToJs f) (HaxeVar Nothing "this")) (var f) | f <- fields ]

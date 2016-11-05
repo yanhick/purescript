@@ -173,6 +173,10 @@ data Haxe
   --
   | HaxeMethod (Maybe SourceSpan) String [String] Haxe
   -- |
+  -- A static class member introduction (name, optional body)
+  --
+  | HaxeStaticMember (Maybe SourceSpan) String (Maybe Haxe)
+  -- |
   -- A class member introduction (name, optional body)
   --
   | HaxeMember (Maybe SourceSpan) String (Maybe Haxe)
@@ -281,6 +285,7 @@ withSourceSpan withSpan = go
   go (HaxeConstructor _ args j) = HaxeConstructor ss args j
   go (HaxeMethod _ name args j) = HaxeMethod ss name args j
   go (HaxeMember _ name j) = HaxeMember ss name j
+  go (HaxeStaticMember _ name j) = HaxeStaticMember ss name j
   go (HaxeApp _ j js) = HaxeApp ss j js
   go (HaxeVar _ s) = HaxeVar ss s
   go (HaxeConditional _ j1 j2 j3) = HaxeConditional ss j1 j2 j3
@@ -320,6 +325,7 @@ getSourceSpan = go
   go (HaxeConstructor ss _ _) = ss
   go (HaxeMethod ss _ _ _) = ss
   go (HaxeMember ss _ _) = ss
+  go (HaxeStaticMember ss _ _) = ss
   go (HaxeApp ss _ _) = ss
   go (HaxeVar ss _) = ss
   go (HaxeConditional ss _ _ _) = ss
@@ -404,6 +410,7 @@ everywhereOnHaxeTopDownM f = f >=> go
   go (HaxeConstructor ss args j) = HaxeConstructor ss args <$> f' j
   go (HaxeMethod ss name args j) = HaxeMethod ss name args <$> f' j
   go (HaxeMember ss name j) = HaxeMember ss name <$> traverse f' j
+  go (HaxeStaticMember ss name j) = HaxeStaticMember ss name <$> traverse f' j
   go other = f other
 
 everythingOnHaxe :: (r -> r -> r) -> (Haxe -> r) -> Haxe -> r
@@ -434,4 +441,5 @@ everythingOnHaxe (<>) f = go
   go j@(HaxeConstructor _ _ j1) = f j <> go j1
   go j@(HaxeMethod _ _ _ j1) = f j <> go j1
   go j@(HaxeMember _ _ (Just j1)) = f j <> go j1
+  go j@(HaxeStaticMember _ _ (Just j1)) = f j <> go j1
   go other = f other
