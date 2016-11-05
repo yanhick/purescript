@@ -139,6 +139,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
   bindToHaxeMethod hx = bindToHaxeMethod' <$> hx
     where
     bindToHaxeMethod' :: Haxe -> Haxe
+    bindToHaxeMethod' b@(HaxeVariableIntroduction _ name (Just c@(HaxeClass _ _ _))) = c
     bindToHaxeMethod' b@(HaxeVariableIntroduction _ name hx) =
       case hx of
         Just hx' -> case hx' of
@@ -166,9 +167,6 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     if withoutComment
        then nonRecToHaxe a i (modifyAnn removeComments e)
        else HaxeComment Nothing com <$> nonRecToHaxe a i (modifyAnn removeComments e)
-  nonRecToHaxe (ss, _, _, _) ident val@(Constructor _ _ _ _) = do
-    js <- valueToJs val
-    withPos ss $ HaxeClass Nothing (identToJs ident) [js]
   nonRecToHaxe (ss, _, _, _) ident val = do
     js <- valueToJs val
     withPos ss $ HaxeVariableIntroduction Nothing (identToJs ident) (Just js)
