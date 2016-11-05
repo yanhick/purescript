@@ -159,7 +159,7 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
-  match (HaxeMember _ name ret) = return $ emit ("public var " ++ name ++ ";" )
+  match (HaxeMember _ name ret) = return $ emit ("public var " ++ name ++ ":Dynamic;" )
   match (HaxeStaticMember _ name ret) = mconcat <$> sequence
     [ return $ emit $ "public static var " ++ name
     , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintHaxe') ret
@@ -307,7 +307,7 @@ prettyPrintHaxe' = A.runKleisli $ runPattern matchValue
                   , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
                       emit ("function "
                         ++ fromMaybe "" name
-                        ++ "(" ++ intercalate ", " args ++ ") ")
+                        ++ "(" ++ intercalate ", " args ++ "):Dynamic ")
                         <> ret ]
                   , [ Wrap typeOf $ \_ s -> emit "typeof " <> s ]
                   , [ unary     Not                  "!"
