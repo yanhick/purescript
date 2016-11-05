@@ -1,6 +1,7 @@
 -- |
 -- This module generates code in the simplified Haxe intermediate representation from Purescript code
 --
+--
 module Language.PureScript.CodeGen.Haxe
   ( module AST
   , module Common
@@ -54,12 +55,14 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     let decls' = renameModules mnLookup decls
     haxeDecls <- mapM bindToHaxe decls'
     let haxeDecls' = bindToHaxeMethod <$> haxeDecls
+    let staticMethodDecls = [ m | m@(HaxeMethod _ _ _ _) <- concat haxeDecls' ]
+    let classDecls = [ m | m@(HaxeClass _ _ _ ) <- concat haxeDecls' ]
     F.traverse_ (F.traverse_ checkIntegers) haxeDecls'
     comments <- not <$> asks optionsNoComments
     let package = HaxePackage Nothing (moduleNameToHaxePackage mn)
     let foreign' = [HaxeImport Nothing (moduleNameToHaxe mn ++ "Foreign") | not $ null foreigns || isNothing foreign_]
-    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (concat haxeDecls')
-    let moduleBody = package : haxeImports ++ foreign' ++ concat haxeDecls'
+    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) staticMethodDecls
+    let moduleBody = package : haxeImports ++ foreign' ++ classDecls ++ [hxClass]
     let foreignExps = exps `intersect` (fst `map` foreigns)
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
