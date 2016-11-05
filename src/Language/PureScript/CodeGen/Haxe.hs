@@ -279,7 +279,7 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
           in HaxeClass Nothing ctor $ members ++ [HaxeConstructor Nothing (identToJs `map` fields) (HaxeBlock Nothing body)] ++ [createFn]
         createFn =
           let body = HaxeUnary Nothing HaxeNew $ HaxeApp Nothing (HaxeVar Nothing ctor) (var `map` fields)
-          in foldr (\f inner -> HaxeMethod Nothing "create" [identToJs f] (HaxeReturn Nothing inner)) body fields
+          in HaxeMethod Nothing "create" [identToJs (head fields)] (HaxeReturn Nothing (foldr (\f inner -> HaxeFunction Nothing (Just "create") [identToJs f] (HaxeBlock Nothing $ [HaxeReturn Nothing inner])) body (tail fields)))
     in return constructor
 
   iife :: String -> [Haxe] -> Haxe
