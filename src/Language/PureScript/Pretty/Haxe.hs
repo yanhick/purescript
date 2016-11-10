@@ -146,7 +146,7 @@ literals = mkPattern' match'
     , return $ emit "}"
     ]
   match (HaxeMethod _ name args ret) = mconcat <$> sequence
-    [ return $ emit ("public static function " ++ name ++ "(" ++ intercalate ", " ((\a -> a ++ ":Dynamic") <$> args) ++ ") {\n")
+    [ return $ emit ("public static function " ++ name ++ "(" ++ intercalate ", " ((\a -> a ++ ":Dynamic") <$> args) ++ "):Dynamic {\n")
     , withIndent $ prettyStatementsSC [ret]
     , return $ emit "\n"
     , currentIndent
