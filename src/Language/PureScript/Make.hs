@@ -333,7 +333,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     let filePath = runModuleName mn
-        jsFile = outputDir </> filePath </> (H.moduleNameToHaxeClass mn ++ ".hx")
+        jsFile = outputDir </> filePath </> (H.moduleNameToHaxeClass mn ++ "Class.hx")
         externsFile = outputDir </> filePath </> (H.moduleNameToHaxeClass mn ++ "_externs.json")
     min <$> getTimestamp jsFile <*> getTimestamp externsFile
 
