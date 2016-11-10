@@ -14,7 +14,7 @@ import Language.PureScript.Names
 moduleNameToHaxe :: ModuleName -> String
 moduleNameToHaxe (ModuleName pns) =
   let name =  runProperName <$> pns
-  in intercalate "." $ replaceBuiltinName <$> ((((<$>) toLower) <$> (init name)) ++ [(last name)])
+  in intercalate "." $ replaceBuiltinName <$> ((((<$>) toLower) <$> (init name)) ++ [(last name) ++ "Class"])
 
 moduleNameToHaxePackage :: ModuleName -> String
 moduleNameToHaxePackage (ModuleName pns) =
@@ -24,7 +24,7 @@ moduleNameToHaxePackage (ModuleName pns) =
 moduleNameToHaxeClass :: ModuleName -> String
 moduleNameToHaxeClass (ModuleName pns) =
   let name =  last $ runProperName <$> pns
-  in replaceBuiltinName name
+  in replaceBuiltinName (name ++ "Class")
 
 moduleNameToFilePath :: ModuleName -> String
 moduleNameToFilePath (ModuleName pns) =
