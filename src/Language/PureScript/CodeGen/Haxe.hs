@@ -61,9 +61,10 @@ moduleToHaxe (Module coms mn imps exps foreigns decls) foreign_ =
     comments <- not <$> asks optionsNoComments
     let package = HaxePackage Nothing (moduleNameToHaxePackage mn)
     let foreign' = [HaxeImport Nothing (moduleNameToHaxe mn ++ "Foreign") | not $ null foreigns || isNothing foreign_]
-    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) staticMethodDecls
-    let moduleBody = package : haxeImports ++ foreign' ++ classDecls ++ [hxClass]
     let foreignExps = exps `intersect` (fst `map` foreigns)
+    let staticForeignMembers = ((\i -> HaxeStaticMember Nothing (identToJs i) (Just (accessor i (var (Ident ((moduleNameToHaxeClass mn) ++ "Foreign"))))))`map` foreignExps)
+    let hxClass = HaxeClass Nothing (moduleNameToHaxeClass mn) (staticMethodDecls ++ staticForeignMembers)
+    let moduleBody = package : haxeImports ++ foreign' ++ classDecls ++ [hxClass]
     let standardExps = exps \\ foreignExps
     let exps' = HaxeObjectLiteral Nothing $ map (runIdent &&& HaxeVar Nothing . identToJs) standardExps
                                ++ map (runIdent &&& foreignIdent mn) foreignExps
