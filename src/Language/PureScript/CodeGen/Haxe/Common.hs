@@ -168,7 +168,6 @@ jsKeywords =
   , "case"
   , "catch"
   , "class"
-  , "const"
   , "continue"
   , "debugger"
   , "default"
