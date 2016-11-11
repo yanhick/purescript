@@ -144,7 +144,6 @@ nameIsHaxeBuiltIn name =
     , "Uint32Array"
     , "Uint8Array"
     , "Uint8ClampedArray"
-    , "undefined"
     , "unescape"
     , "URIError"
     , "WeakMap"

@@ -218,7 +218,7 @@ unit = "unit"
 -- Prim values
 
 undefined :: String
-undefined = "undefined"
+undefined = "null"
 
 -- Type Class Dictionary Names
 
